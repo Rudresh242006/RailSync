@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Search Trains{% endblock %}
+{% block page_title %}Search & Book Trains{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:24px">
+  <div class="card-title" style="margin-bottom:16px">Find Your Train</div>
+  <form method="POST">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:end">
+      <div class="form-group" style="margin-bottom:0">
+        <label>From</label>
+        <select name="source_station_id" required>
+          <option value="">Select origin</option>
+          {% for s in stations %}
+          <option value="{{ s.station_id }}">{{ s.station_name }} ({{ s.city }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>To</label>
+        <select name="destination_station_id" required>
+          <option value="">Select destination</option>
+          {% for s in stations %}
+          <option value="{{ s.station_id }}">{{ s.station_name }} ({{ s.city }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Journey Date</label>
+        <input type="date" name="journey_date" required min="{{ today }}">
+      </div>
+      <button type="submit" class="btn btn-primary" style="height:42px;white-space:nowrap">
+        🔍 Search
+      </button>
+    </div>
+  </form>
+</div>
+
+{% if trains %}
+<div style="font-size:14px;color:var(--muted);margin-bottom:16px">
+  Found <strong style="color:var(--text)">{{ trains|length }}</strong> train(s)
+</div>
+
+{% for t in trains %}
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:18px;font-weight:700">{{ t.train.train_name }}</span>
+        <span class="mono">{{ t.train.train_number }}</span>
+        {% if t.status and t.status.delay_minutes > 0 %}
+        <span class="delay-pill delay-{% if t.status.delay_minutes > 30 %}crit{% else %}warn{% endif %}">
+          ⚠ +{{ t.status.delay_minutes }} min delay
+        </span>
+        {% else %}
+        <span class="delay-pill delay-ok">✓ On Time</span>
+        {% endif %}
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px">
+        <span>{{ t.train.total_seats }} seats total</span>
+        <span>·</span>
+        <span style="color:{% if t.available_seats > 10 %}var(--green){% elif t.available_seats > 0 %}var(--amber){% else %}var(--red){% endif %}">
+          {{ t.available_seats }} available
+        </span>
+      </div>
+    </div>
+
+    <!-- BOOKING FORM -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <a href="{{ url_for('user.seat_map', train_id=t.train.train_id, journey_date=t.journey_date) }}"
+         class="btn btn-ghost btn-sm">🪑 View Seats</a>
+      <button onclick="toggleBookForm('{{ t.train.train_id }}')" class="btn btn-primary btn-sm">
+        Book →
+      </button>
+    </div>
+  </div>
+
+  <!-- Expandable booking form -->
+  <div id="book-form-{{ t.train.train_id }}" style="display:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+    <form method="POST" action="{{ url_for('user.book') }}">
+      <input type="hidden" name="train_id" value="{{ t.train.train_id }}">
+      <input type="hidden" name="source_station_id" value="{{ t.src_id }}">
+      <input type="hidden" name="destination_station_id" value="{{ t.dst_id }}">
+      <input type="hidden" name="journey_date" value="{{ t.journey_date }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:end">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Seat Preference</label>
+          <select name="seat_preference">
+            <option value="any">Any Seat</option>
+            <option value="window">Window Seat (A/F)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Payment Method</label>
+          <select name="payment_method">
+            <option>UPI</option><option>CARD</option>
+            <option>NETBANKING</option><option>WALLET</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Amount (₹)</label>
+          <input type="number" name="amount" value="500" min="1" step="0.01">
+        </div>
+        <button type="submit" class="btn btn-primary" style="height:42px">Confirm →</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+{% elif request.method == 'POST' %}
+<div class="card" style="text-align:center;padding:60px">
+  <div style="font-size:48px;margin-bottom:12px">🚫</div>
+  <div style="font-size:16px;font-weight:600;margin-bottom:6px">No trains found</div>
+  <div style="color:var(--muted)">Try different stations or date</div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelector('input[type=date]').min = new Date().toISOString().split('T')[0];
+
+function toggleBookForm(id) {
+  const el = document.getElementById('book-form-' + id);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

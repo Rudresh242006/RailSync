@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block page_title %}Station Overview{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px">
+  <div style="font-size:22px;font-weight:700">{{ station.station_name }}</div>
+  <div style="color:var(--muted);font-size:14px">{{ station.city }}, {{ station.state }}</div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Platforms</div>
+    <div class="stat-value">{{ platforms|length }}</div>
+    <div class="stat-sub">At this station</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Trains Today</div>
+    <div class="stat-value">{{ trains_at_station|length }}</div>
+    <div class="stat-sub">Scheduled</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Delayed</div>
+    <div class="stat-value" style="color:var(--amber)">{{ delayed|length }}</div>
+    <div class="stat-sub">Needs attention</div>
+  </div>
+</div>
+
+<!-- PLATFORM STATUS BOARD -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header">
+    <div class="card-title">🚉 Platform Status Board</div>
+    <a href="{{ url_for('admin.platforms') }}" class="btn btn-ghost btn-sm">Manage</a>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+    {% for p in platforms %}
+    {% set alloc = p.allocations|selectattr('departure_time', 'gt', now)|list|first %}
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-size:22px;font-weight:800;color:var(--accent2)">Platform {{ p.platform_number }}</div>
+      {% if alloc %}
+      <div style="margin-top:8px">
+        <div style="font-size:12px;font-weight:600">{{ alloc.train.train_name }}</div>
+        <div style="font-size:11px;color:var(--muted)">{{ alloc.arrival_time.strftime('%H:%M') }} – {{ alloc.departure_time.strftime('%H:%M') }}</div>
+        <span class="badge badge-blue" style="margin-top:4px">Occupied</span>
+      </div>
+      {% else %}
+      <div style="margin-top:8px"><span class="badge badge-green">Free</span></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if not platforms %}
+    <div style="color:var(--muted);font-size:13px;grid-column:1/-1">No platforms configured. <a href="{{ url_for('admin.platforms') }}">Add platforms →</a></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- DELAYED TRAINS -->
+{% if delayed %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title" style="color:var(--amber)">⚠ Delayed Trains</div>
+    <a href="{{ url_for('admin.report_delay') }}" class="btn btn-ghost btn-sm">Report Delay</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Train</th><th>Delay</th><th>Current Station</th><th>Last Updated</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for s in delayed %}
+        <tr>
+          <td>
+            <div style="font-weight:600">{{ s.train.train_name }}</div>
+            <div class="mono">{{ s.train.train_number }}</div>
+          </td>
+          <td>
+            <span class="delay-pill {% if s.delay_minutes > 30 %}delay-crit{% else %}delay-warn{% endif %}">
+              +{{ s.delay_minutes }} min
+            </span>
+          </td>
+          <td>{{ s.current_station.station_name }}</td>
+          <td style="font-size:12px;color:var(--muted)">{{ s.last_updated.strftime('%H:%M:%S') }}</td>
+          <td>
+            <a href="{{ url_for('admin.report_delay') }}" class="btn btn-ghost btn-sm">Update →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// inject `now` for Jinja comparison
+</script>
+{% endblock %}

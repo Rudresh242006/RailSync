@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Add Station Master{% endblock %}
+{% block page_title %}Register Station Master{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+  <div class="card-header">
+    <div class="card-title">New Official Details</div>
+    <a href="{{ url_for('admin.super_masters') }}" class="btn btn-ghost btn-sm">← Back</a>
+  </div>
+  
+  <form method="POST">
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" name="name" required placeholder="John Doe">
+    </div>
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" name="email" required placeholder="hq@railsync.local">
+    </div>
+    <div class="form-group">
+      <label>Phone Number</label>
+      <input type="text" name="phone" required placeholder="+91 99999 99999">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" name="password" required>
+    </div>
+    <div class="form-group">
+      <label>Assigned Station</label>
+      <select name="station_id" required>
+        <option value="">-- Select Station --</option>
+        {% for s in stations %}
+        <option value="{{ s.station_id }}">{{ s.station_name }} ({{ s.city }}, {{ s.state }})</option>
+        {% endfor %}
+      </select>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+        Don't see the station? <a href="{{ url_for('admin.stations') }}">Add it here</a> first.
+      </div>
+    </div>
+    <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="is_super_admin" id="is_super_admin" style="width:auto;">
+      <label for="is_super_admin" style="margin:0;">Grant Super Admin Access (Railway HQ Level)</label>
+    </div>
+    
+    <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:16px;">
+      Register Official
+    </button>
+  </form>
+</div>
+{% endblock %}

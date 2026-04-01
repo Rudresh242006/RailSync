@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Stations Network{% endblock %}
+{% block page_title %}Railway Stations Network{% endblock %}
+
+{% block extra_head %}
+<style>
+  .search-wrap-inner {
+    position: relative;
+    display: inline-block;
+  }
+  .search-wrap-inner i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 13px;
+    pointer-events: none;
+  }
+  .search-wrap-inner input {
+    padding-left: 36px;
+    max-width: 320px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 360px;gap:24px;">
+  
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">All Stations</div>
+      <div style="font-size:13px;color:var(--muted)">{{ stations|length }} Locations</div>
+    </div>
+
+    <!-- Search bar -->
+    <div style="padding:4px 0 14px;">
+      <div class="search-wrap-inner">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="station-search" placeholder="Search stations by name, city or state…"
+               oninput="filterStations()" style="width:340px;">
+      </div>
+    </div>
+    
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Station Name</th>
+            <th>Location</th>
+            <th>Platforms Conf.</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="stations-body">
+          {% for s in stations %}
+          <tr>
+            <td class="mono">#{{ s.station_id }}</td>
+            <td style="font-weight:600">{{ s.station_name }}</td>
+            <td>
+              <div>{{ s.city }}</div>
+              <div style="font-size:12px;color:var(--muted)">{{ s.state }}</div>
+            </td>
+            <td>
+              {% if s.platforms %}
+              <span class="badge badge-green">{{ s.platforms|length }} Platforms</span>
+              {% else %}
+              <span class="badge badge-amber">None</span>
+              {% endif %}
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.remove_station', station_id=s.station_id) }}" onsubmit="return confirm('WARNING: Are you sure you want to delete this station? This might fail if there are existing bookings linked to it.');">
+                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not stations %}
+          <tr><td colspan="5" style="text-align:center;color:var(--muted)">No stations configured yet.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+      <div id="no-station-results" style="display:none;padding:14px;text-align:center;color:var(--muted);font-size:13px;">No stations match your search.</div>
+    </div>
+  </div>
+  
+  <div>
+    <div class="card" style="position:sticky;top:84px;">
+      <div class="card-header">
+        <div class="card-title">Register New Station</div>
+      </div>
+      
+      <form method="POST" action="{{ url_for('admin.add_station') }}">
+        <div class="form-group">
+          <label>Station Name</label>
+          <input type="text" name="station_name" required placeholder="Central Terminal">
+        </div>
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" name="city" required placeholder="Metropolis">
+        </div>
+        <div class="form-group">
+          <label>State</label>
+          <input type="text" name="state" required placeholder="Maharashtra">
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:8px;">
+          Add to Network
+        </button>
+      </form>
+    </div>
+  </div>
+  
+</div>
+
+<script>
+function filterStations() {
+  const query = document.getElementById('station-search').value.toLowerCase();
+  const rows = document.getElementById('stations-body').querySelectorAll('tr');
+  let visible = 0;
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const match = text.includes(query);
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  document.getElementById('no-station-results').style.display =
+    (visible === 0 && query.length > 0) ? 'block' : 'none';
+}
+</script>
+{% endblock %}

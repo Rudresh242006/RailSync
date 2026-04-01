@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Add Train{% endblock %}
+{% block page_title %}Add New Train{% endblock %}
+
+{% block extra_head %}
+<style>
+  .stop-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px 10px;
+    position: relative;
+  }
+  .stop-row .stop-num {
+    position: absolute;
+    top: -10px;
+    left: 14px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--bg3);
+    padding: 0 6px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+  .stop-row select.invalid-stop {
+    border-color: var(--red) !important;
+    box-shadow: 0 0 0 2px rgba(239,68,68,0.15);
+  }
+  .stop-row select.valid-stop {
+    border-color: var(--green) !important;
+    box-shadow: 0 0 0 2px rgba(34,197,94,0.10);
+  }
+  .stop-hint {
+    font-size: 11px;
+    margin-top: 3px;
+    display: none;
+  }
+  .stop-hint.err { color: var(--red); display: block; }
+  .stop-hint.ok  { color: var(--green); display: block; }
+  .dup-warn {
+    font-size: 12px;
+    color: var(--amber);
+    margin-top: 4px;
+    display: none;
+  }
+  .dup-warn.show { display: block; }
+</style>
+
+{# ── JSON data island: IDE treats this as opaque data, not JS ── #}
+<script type="application/json" id="stations-data">{{ stations|tojson }}</script>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:760px">
+  <div class="card-header" style="margin-bottom:20px">
+    <div class="card-title">New Train Details</div>
+    <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost btn-sm">← Back</a>
+  </div>
+
+  <form method="POST" id="add-train-form" onsubmit="return validateForm()">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:6px">
+      <div class="form-group" style="margin-bottom:0">
+        <label>Train Number</label>
+        <input type="text" id="train_number" name="train_number" placeholder="12345" required maxlength="10"
+               oninput="checkDuplicate(this, 'num')">
+        <div id="num-warn" class="dup-warn"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Train Name</label>
+        <input type="text" id="train_name" name="train_name" placeholder="Rajdhani Express" required
+               oninput="checkDuplicate(this, 'name')">
+        <div id="name-warn" class="dup-warn"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Total Seats</label>
+        <input type="number" name="total_seats" placeholder="500" required min="1">
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:20px">
+      Duplicates are not allowed. Train number and name must be unique across the entire network.
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <div style="font-weight:600;font-size:15px">Route Stops</div>
+          <div style="font-size:12px;color:var(--muted)">Each stop must match a registered station name or city.</div>
+        </div>
+        <button type="button" onclick="addStop()" class="btn btn-ghost btn-sm">+ Add Stop</button>
+      </div>
+      <div id="stops-container">
+        <!-- Stops added dynamically -->
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button type="submit" class="btn btn-primary" id="submit-btn">Save Train →</button>
+      <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+// Read stations from the JSON data island (avoids Jinja inside <script>)
+var stations = JSON.parse(document.getElementById('stations-data').textContent);
+
+var stopCount = 0;
+var numBlocked = false;
+var nameBlocked = false;
+var numTimer, nameTimer;
+
+// ── Duplicate check ────────────────────────────────────────────────
+function checkDuplicate(input, type) {
+  var val = input.value.trim();
+  var warnEl = document.getElementById(type === 'num' ? 'num-warn' : 'name-warn');
+  if (!val) { warnEl.classList.remove('show'); warnEl.textContent = ''; return; }
+
+  if (type === 'num') { clearTimeout(numTimer); }
+  else { clearTimeout(nameTimer); }
+
+  var timer = setTimeout(function() {
+    fetch('/admin/api/check-train-duplicate?type=' + type + '&value=' + encodeURIComponent(val))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.exists) {
+          warnEl.textContent = '\u26a0 ' + data.message;
+          warnEl.classList.add('show');
+          warnEl.style.color = 'var(--red)';
+          if (type === 'num') { numBlocked = true; }
+          else { nameBlocked = true; }
+        } else {
+          warnEl.textContent = '\u2713 Available';
+          warnEl.classList.add('show');
+          warnEl.style.color = 'var(--green)';
+          if (type === 'num') { numBlocked = false; }
+          else { nameBlocked = false; }
+        }
+      });
+  }, 450);
+
+  if (type === 'num') { numTimer = timer; }
+  else { nameTimer = timer; }
+}
+
+// ── Stop management ────────────────────────────────────────────────
+function addStop(preselectedId, preArrival, preDeparture) {
+  stopCount++;
+  var idx = stopCount;
+  var div = document.createElement('div');
+  div.className = 'stop-row';
+  div.id = 'stop-' + idx;
+
+  var labelStation = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Station</label>' : '';
+  var labelArrival = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Arrival</label>' : '';
+  var labelDepart  = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Departure</label>' : '';
+
+  var options = '<option value="">Select station</option>';
+  for (var i = 0; i < stations.length; i++) {
+    var s = stations[i];
+    var sel = (preselectedId && String(s.station_id) === String(preselectedId)) ? ' selected' : '';
+    options += '<option value="' + s.station_id + '"' + sel + '>' + s.station_name + ' (' + s.city + ')</option>';
+  }
+
+  div.innerHTML =
+    '<span class="stop-num">Stop ' + idx + '</span>' +
+    '<div class="form-group" style="margin-bottom:0">' +
+      labelStation +
+      '<select name="stop_station_id" required onchange="validateStopSelect(this,' + idx + ')">' +
+        options +
+      '</select>' +
+      '<div class="stop-hint" id="hint-' + idx + '"></div>' +
+    '</div>' +
+    '<div class="form-group" style="margin-bottom:0">' +
+      labelArrival +
+      '<input type="time" name="arrival_time" value="' + (preArrival || '') + '">' +
+    '</div>' +
+    '<div class="form-group" style="margin-bottom:0">' +
+      labelDepart +
+      '<input type="time" name="departure_time" value="' + (preDeparture || '') + '">' +
+    '</div>' +
+    '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm" style="margin-bottom:0">\u2715</button>';
+
+  document.getElementById('stops-container').appendChild(div);
+  renumberStops();
+
+  if (preselectedId) {
+    validateStopSelect(div.querySelector('select'), idx);
+  }
+}
+
+function removeStop(id) {
+  var el = document.getElementById('stop-' + id);
+  if (el) { el.remove(); }
+  renumberStops();
+}
+
+function renumberStops() {
+  var rows = document.querySelectorAll('#stops-container .stop-row');
+  for (var i = 0; i < rows.length; i++) {
+    var numEl = rows[i].querySelector('.stop-num');
+    if (numEl) { numEl.textContent = 'Stop ' + (i + 1); }
+  }
+}
+
+function validateStopSelect(select, idx) {
+  var hint = document.getElementById('hint-' + idx);
+  var stationId = parseInt(select.value);
+  if (!stationId) {
+    hint.textContent = '';
+    hint.className = 'stop-hint';
+    select.classList.remove('valid-stop', 'invalid-stop');
+    return;
+  }
+  var found = null;
+  for (var i = 0; i < stations.length; i++) {
+    if (stations[i].station_id === stationId) { found = stations[i]; break; }
+  }
+  if (found) {
+    hint.textContent = '\u2713 ' + found.station_name + ', ' + found.city;
+    hint.className = 'stop-hint ok';
+    select.classList.remove('invalid-stop');
+    select.classList.add('valid-stop');
+  } else {
+    hint.textContent = '\u2717 Station not found in registry';
+    hint.className = 'stop-hint err';
+    select.classList.remove('valid-stop');
+    select.classList.add('invalid-stop');
+  }
+}
+
+function validateForm() {
+  if (numBlocked || nameBlocked) {
+    alert('Please fix duplicate train number / name issues before saving.');
+    return false;
+  }
+  var selects = document.querySelectorAll('#stops-container select[name="stop_station_id"]');
+  if (selects.length === 0) {
+    alert('Please add at least one route stop.');
+    return false;
+  }
+  for (var i = 0; i < selects.length; i++) {
+    if (!selects[i].value) {
+      alert('Please select a valid station for every stop.');
+      return false;
+    }
+  }
+  return true;
+}
+
+// Add 2 stops by default
+addStop();
+addStop();
+</script>
+{% endblock %}

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RailSync — AI-Powered Smart Railway Platform</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: #08090e;
+      color: #e8eaf0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    /* GRID BG */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(108,99,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108,99,255,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 0;
+    }
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 40px 24px;
+      position: relative; z-index: 1;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px; border-radius: 100px;
+      background: rgba(108,99,255,0.12);
+      border: 1px solid rgba(108,99,255,0.3);
+      font-size: 12px; font-weight: 600; color: #a89cff;
+      margin-bottom: 28px; letter-spacing: 0.5px;
+    }
+    .hero-badge::before { content: '●'; font-size: 8px; color: #22c55e; }
+    h1 {
+      font-size: clamp(42px, 7vw, 80px);
+      font-weight: 800; line-height: 1.05;
+      letter-spacing: -2px; margin-bottom: 20px;
+    }
+    h1 span { color: #6c63ff; }
+    .sub {
+      font-size: 18px; color: #8b8fa8; max-width: 520px;
+      line-height: 1.6; margin-bottom: 40px;
+    }
+    .cta-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .btn {
+      padding: 13px 28px; border-radius: 10px;
+      font-size: 15px; font-weight: 600; font-family: inherit;
+      cursor: pointer; border: none; transition: all 0.2s;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary { background: #6c63ff; color: #fff; }
+    .btn-primary:hover { background: #7c73ff; transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent; color: #e8eaf0;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.06); }
+
+    /* TRACK ANIMATION */
+    .track-anim {
+      width: 100%; max-width: 700px;
+      margin: 60px auto 0; position: relative;
+    }
+    .rail-line {
+      height: 2px;
+      background: rgba(108,99,255,0.3);
+      position: relative; overflow: visible;
+    }
+    .train-dot {
+      width: 40px; height: 16px;
+      background: #6c63ff; border-radius: 8px;
+      position: absolute; top: -7px; left: -40px;
+      animation: ride 4s ease-in-out infinite;
+      box-shadow: 0 0 20px rgba(108,99,255,0.6);
+    }
+    @keyframes ride {
+      0%   { left: -40px; }
+      100% { left: calc(100% + 40px); }
+    }
+
+    /* FEATURES */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      max-width: 900px; margin: 60px auto 0;
+      padding: 0 24px;
+    }
+    .feat {
+      background: #111318;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; padding: 20px;
+    }
+    .feat-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: rgba(108,99,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 12px;
+    }
+    .feat h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .feat p { font-size: 13px; color: #8b8fa8; line-height: 1.5; }
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-badge">AI-Powered · Real-time · Secure</div>
+  <h1>Smart Railway<br><span>Platform Allocation</span></h1>
+  <p class="sub">AI dynamically reallocates platforms during delays, keeps passengers informed in real time, and streamlines station operations.</p>
+  <div class="cta-group">
+    <a href="{{ url_for('auth.login') }}?role=user" class="btn btn-primary">🚆 Passenger Login</a>
+    <a href="{{ url_for('auth.register') }}" class="btn btn-ghost">Register Free</a>
+    <a href="{{ url_for('auth.login') }}?role=admin" class="btn btn-ghost">🛡 Station Master</a>
+  </div>
+
+  <div class="track-anim">
+    <div class="rail-line"><div class="train-dot"></div></div>
+  </div>
+</div>
+
+<div class="features">
+  <div class="feat">
+    <div class="feat-icon">🤖</div>
+    <h3>AI Platform Engine</h3>
+    <p>Claude AI reassigns platforms in real-time during disruptions, avoiding conflicts automatically.</p>
+  </div>
+  <div class="feat">
+    <div class="feat-icon">🔔</div>
+    <h3>Live Notifications</h3>
+    <p>Instant alerts for delays, platform changes, and booking updates — right in your dashboard.</p>
+  </div>
+  <div class="feat">
+    <div class="feat-icon">💳</div>
+    <h3>Secure Payments</h3>
+    <p>UPI, Card, Netbanking — fast, secure transactions with bcrypt-hashed credentials.</p>
+  </div>
+  <div class="feat">
+    <div class="feat-icon">📍</div>
+    <h3>Live Train Tracking</h3>
+    <p>Track your train's position, expected arrival, and platform in real time.</p>
+  </div>
+</div>
+</body>
+</html>

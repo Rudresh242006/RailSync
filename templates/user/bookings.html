@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}My Bookings{% endblock %}
+{% block page_title %}My Bookings{% endblock %}
+{% block content %}
+{% if bookings %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Booking ID</th><th>Train</th><th>Route</th><th>Date</th><th>Seat</th><th>Payment</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr>
+          <td><span class="mono">#{{ b.booking_id }}</span></td>
+          <td>
+            <div style="font-weight:600">{{ b.train.train_name }}</div>
+            <div class="mono">{{ b.train.train_number }}</div>
+          </td>
+          <td style="font-size:12px;color:var(--muted)">
+            {{ b.source_station.station_name }}<br>→ {{ b.destination_station.station_name }}
+          </td>
+          <td>{{ b.journey_date.strftime('%d %b %Y') }}</td>
+          <td>
+            <span class="mono">{{ b.seat_number or 'TBD' }}</span>
+            {% if b.is_window_seat %}<span class="badge badge-blue" style="margin-left:4px">Win</span>{% endif %}
+          </td>
+          <td>
+            {% if b.payment %}
+            <div style="font-size:12px">₹{{ b.payment.amount }}</div>
+            <div style="font-size:11px;color:var(--muted)">{{ b.payment.payment_method }}</div>
+            {% if b.payment.payment_status == 'REFUNDED' %}
+            <span class="badge badge-amber">Refunded</span>
+            {% elif b.payment.payment_status == 'PENDING' %}
+            <span class="badge badge-blue">Pending</span>
+            <div style="margin-top: 4px;">
+              <a href="{{ url_for('user.payment_page', payment_id=b.payment.payment_id) }}" class="badge badge-green" style="text-decoration: none; cursor: pointer;">Pay Now</a>
+            </div>
+            {% elif b.payment.payment_status == 'FAILED' %}
+            <span class="badge badge-red">Failed</span>
+            {% else %}
+            <span class="badge badge-green">Paid</span>
+            {% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if b.status == 'CONFIRMED' %}<span class="badge badge-green">Confirmed</span>
+            {% elif b.status == 'WAITLISTED' %}<span class="badge badge-amber">Waitlisted</span>
+            {% else %}<span class="badge badge-red">Cancelled</span>{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <a href="{{ url_for('user.track', train_id=b.train_id) }}" class="btn btn-ghost btn-sm">📍</a>
+              {% if b.status != 'CANCELLED' %}
+              <form method="POST" action="{{ url_for('user.cancel_booking', booking_id=b.booking_id) }}" onsubmit="return confirm('Cancel this booking?')">
+                <button type="submit" class="btn btn-danger btn-sm">✕</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:60px">
+  <div style="font-size:48px;margin-bottom:12px">🎫</div>
+  <div style="font-size:16px;font-weight:600">No bookings yet</div>
+  <a href="{{ url_for('user.search') }}" class="btn btn-primary" style="margin-top:16px">Search Trains →</a>
+</div>
+{% endif %}
+{% endblock %}

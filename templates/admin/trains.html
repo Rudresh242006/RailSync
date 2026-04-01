@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Manage Trains{% endblock %}
+{% block page_title %}Manage Trains{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div>
+    <div style="font-size:22px;font-weight:700">Fleet Management</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:2px">
+      <span style="background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:2px 12px;font-weight:700;color:var(--text)">
+        {{ trains|length }} Train{% if trains|length != 1 %}s{% endif %} in network
+      </span>
+    </div>
+  </div>
+  <a href="{{ url_for('admin.add_train') }}" class="btn btn-primary">+ Add Train</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Train Number</th>
+          <th>Name</th>
+          <th>Total Seats</th>
+          <th>Stops</th>
+          <th>Current Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for train in trains %}
+        {% set status = train.statuses|first %}
+        <tr>
+          <td><span class="mono">{{ train.train_number }}</span></td>
+          <td style="font-weight:600">{{ train.train_name }}</td>
+          <td>{{ train.total_seats }}</td>
+          <td><span class="badge badge-blue">{{ train.routes|length }} stops</span></td>
+          <td>
+            {% if status %}
+              {% if status.delay_minutes > 0 %}
+              <span class="delay-pill delay-{% if status.delay_minutes > 30 %}crit{% else %}warn{% endif %}">+{{ status.delay_minutes }} min</span>
+              {% else %}
+              <span class="delay-pill delay-ok">On Time</span>
+              {% endif %}
+            {% else %}
+            <span style="color:var(--muted);font-size:12px">No status</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              {% if current_user.role == 'super_admin' %}
+              <a href="{{ url_for('admin.edit_train_stops', train_id=train.train_id) }}" class="btn btn-ghost btn-sm">✏ Edit Stops</a>
+              {% endif %}
+              <form method="POST" action="{{ url_for('admin.remove_train', train_id=train.train_id) }}" onsubmit="return confirm('Remove this train? All related data will be deleted.')">
+                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not trains %}
+        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px">No trains found. <a href="{{ url_for('admin.add_train') }}">Add one →</a></td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

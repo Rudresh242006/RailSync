@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}HQ Analytics{% endblock %}
+{% block page_title %}HQ Analytics & Live Reporting{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+  <!-- Revenue Breakdown -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><i class="fa-solid fa-indian-rupee-sign" style="color:var(--green);margin-right:8px;"></i>Revenue by Method</div>
+    </div>
+    <div style="margin-top:16px;">
+      {% for method, amount in revenue_by_method %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="font-weight:500;">
+          {% if method == 'UPI' %}<i class="fa-solid fa-qrcode" style="margin-right:8px;color:var(--blue);"></i>
+          {% elif method == 'CARD' %}<i class="fa-solid fa-credit-card" style="margin-right:8px;color:var(--amber);"></i>
+          {% else %}<i class="fa-solid fa-wallet" style="margin-right:8px;color:var(--purple);"></i>{% endif %}
+          {{ method }}
+        </div>
+        <div class="mono" style="font-size:16px;font-weight:700;">₹{{ "{:,.2f}".format(amount) }}</div>
+      </div>
+      {% endfor %}
+      {% if not revenue_by_method %}
+      <div style="color:var(--muted);text-align:center;padding:20px;">No revenue data recorded yet.</div>
+      {% endif %}
+    </div>
+  </div>
+  
+  <!-- Top Trains -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><i class="fa-solid fa-fire" style="color:var(--amber);margin-right:8px;"></i>Top 5 Busiest Trains</div>
+    </div>
+    <div style="margin-top:16px;">
+      {% for name, count in top_trains %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="font-weight:600;">{{ loop.index }}. {{ name }}</div>
+        <div>
+          <span class="badge badge-purple">{{ count }} Bookings</span>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not top_trains %}
+      <div style="color:var(--muted);text-align:center;padding:20px;">No train booking data available yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — RailSync</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: #08090e;
+      color: #e8eaf0;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(108,99,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108,99,255,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 0;
+    }
+    .card {
+      width: 100%; max-width: 400px;
+      background: #111318;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px; padding: 36px;
+      position: relative; z-index: 1;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 20px; font-weight: 700; margin-bottom: 28px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px; background: #6c63ff;
+      border-radius: 9px; display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .sub { font-size: 14px; color: #8b8fa8; margin-bottom: 24px; }
+
+    /* ROLE TABS */
+    .role-tabs {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-bottom: 24px;
+    }
+    .role-tab {
+      padding: 10px; border-radius: 9px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: transparent; color: #8b8fa8;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      transition: all 0.2s; text-align: center;
+    }
+    .role-tab.active {
+      background: rgba(108,99,255,0.15);
+      border-color: rgba(108,99,255,0.5);
+      color: #a89cff;
+    }
+
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #8b8fa8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input {
+      width: 100%; padding: 10px 14px;
+      background: #181b24; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 9px; color: #e8eaf0;
+      font-family: inherit; font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #6c63ff; }
+    .btn {
+      width: 100%; padding: 12px;
+      background: #6c63ff; color: #fff;
+      border: none; border-radius: 10px;
+      font-family: inherit; font-size: 15px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #7c73ff; }
+    .footer-link { text-align: center; font-size: 13px; color: #8b8fa8; margin-top: 20px; }
+    .footer-link a { color: #a89cff; }
+
+    .alert {
+      padding: 10px 14px; border-radius: 9px;
+      font-size: 13px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .alert-danger { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; }
+    .alert-warning { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: #f59e0b; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🚆</div>
+    RailSync
+  </div>
+  <h2>Welcome back</h2>
+  <p class="sub">Sign in to your account</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="role-tabs">
+    <button class="role-tab active" id="tab-user" onclick="setRole('user')">🧑 Passenger</button>
+    <button class="role-tab" id="tab-admin" onclick="setRole('admin')">🛡 Station Master</button>
+  </div>
+
+  <form method="POST" action="{{ url_for('auth.login') }}">
+    <input type="hidden" name="role" id="role-input" value="{{ request.args.get('role', 'user') }}">
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" name="password" placeholder="••••••••" required>
+    </div>
+    <button type="submit" class="btn">Sign In →</button>
+  </form>
+
+  <div class="footer-link">
+    New passenger? <a href="{{ url_for('auth.register') }}">Create account</a>
+  </div>
+</div>
+
+<script>
+function setRole(role) {
+  document.getElementById('role-input').value = role;
+  document.getElementById('tab-user').classList.toggle('active', role === 'user');
+  document.getElementById('tab-admin').classList.toggle('active', role === 'admin');
+}
+// Auto-set from URL param
+const urlRole = new URLSearchParams(window.location.search).get('role');
+if (urlRole) setRole(urlRole);
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Track {{ train.train_name }}{% endblock %}
+{% block page_title %}Live Train Tracker{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start">
+  <!-- MAIN TRACK -->
+  <div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div>
+          <div style="font-size:20px;font-weight:700">{{ train.train_name }}</div>
+          <div class="mono">{{ train.train_number }}</div>
+        </div>
+        {% if status %}
+        <div class="delay-pill {% if status.delay_minutes == 0 %}delay-ok{% elif status.delay_minutes <= 30 %}delay-warn{% else %}delay-crit{% endif %}">
+          {% if status.delay_minutes == 0 %}✓ On Time{% else %}⚠ +{{ status.delay_minutes }} min{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      {% if allocation %}
+      <div style="background:rgba(108,99,255,0.1);border:1px solid rgba(108,99,255,0.3);border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">CURRENT PLATFORM</div>
+        <div style="font-size:28px;font-weight:800;color:var(--accent2)">Platform {{ allocation.platform.platform_number }}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">
+          Arr: {{ allocation.arrival_time.strftime('%H:%M') }} · Dep: {{ allocation.departure_time.strftime('%H:%M') }}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ROUTE TIMELINE -->
+      <div>
+        {% for r in routes %}
+        <div style="display:flex;gap:14px;margin-bottom:{% if not loop.last %}0{% else %}0{% endif %}">
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div style="width:12px;height:12px;border-radius:50%;background:{% if status and status.current_station_id == r.station_id %}var(--accent){% else %}var(--border2){% endif %};flex-shrink:0;margin-top:3px"></div>
+            {% if not loop.last %}
+            <div style="width:2px;flex:1;background:var(--border);min-height:30px;margin:4px 0"></div>
+            {% endif %}
+          </div>
+          <div style="padding-bottom:20px">
+            <div style="font-weight:{% if status and status.current_station_id == r.station_id %}600{% else %}400{% endif %};font-size:14px;{% if status and status.current_station_id == r.station_id %}color:var(--accent2){% endif %}">
+              {{ r.station.station_name }}
+              {% if status and status.current_station_id == r.station_id %}
+              <span class="badge badge-purple" style="margin-left:6px">● Live</span>
+              {% endif %}
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">
+              {% if r.arrival_time %}Arr {{ r.arrival_time.strftime('%H:%M') }}{% endif %}
+              {% if r.departure_time %} · Dep {{ r.departure_time.strftime('%H:%M') }}{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- STATUS SIDEBAR -->
+  <div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">Live Status</div>
+      {% if status %}
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--muted)">Current Location</div>
+        <div style="font-weight:600;margin-top:2px">{{ status.current_station.station_name }}</div>
+        <div style="font-size:12px;color:var(--muted)">{{ status.current_station.city }}</div>
+      </div>
+      {% if status.expected_arrival %}
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--muted)">Expected Arrival</div>
+        <div style="font-weight:600;margin-top:2px">{{ status.expected_arrival.strftime('%d %b, %H:%M') }}</div>
+      </div>
+      {% endif %}
+      <div>
+        <div style="font-size:11px;color:var(--muted)">Last Updated</div>
+        <div style="font-size:12px;margin-top:2px">{{ status.last_updated.strftime('%H:%M:%S') }}</div>
+      </div>
+      {% else %}
+      <div style="color:var(--muted);font-size:13px">No live data available</div>
+      {% endif %}
+    </div>
+
+    <button onclick="refreshStatus()" class="btn btn-ghost" style="width:100%">↻ Refresh</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
+<script>
+  async function refreshStatus() {
+    location.reload();
+  }
+  setInterval(refreshStatus, 60000);
+
+  function showToast(message) {
+      const ctr = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.style = 'background: var(--accent); color: white; padding: 16px 20px; margin-top: 10px; border-radius: 8px; font-weight: 600; min-width: 300px; transform: translateX(120%); transition: transform 0.3s ease-out; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid var(--border);';
+      t.innerHTML = `<i class="fa-solid fa-bolt" style="color: #fbbf24; margin-right: 8px;"></i> ${message}`;
+      ctr.appendChild(t);
+      setTimeout(() => { t.style.transform = 'translateX(0)'; }, 10);
+      setTimeout(() => { 
+          t.style.transform = 'translateX(120%)'; 
+          setTimeout(() => { location.reload(); }, 300);
+      }, 5000);
+  }
+
+  const socket = io();
+  socket.on('connect', () => {
+      socket.emit('join', {room: 'train_{{ train.train_id }}'});
+  });
+
+  socket.on('new_notification', function(data) {
+      if(data.train_id == {{ train.train_id }}) {
+          showToast(data.message);
+      }
+  });
+</script>
+{% endblock %}

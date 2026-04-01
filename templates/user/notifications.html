@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block content %}
+{% if notifications %}
+<div style="display:flex;flex-direction:column;gap:10px">
+  {% for n in notifications %}
+  <div class="card" style="border-left:3px solid {% if 'delay' in n.message.lower() or 'platform' in n.message.lower() %}var(--amber){% else %}var(--accent){% endif %};display:flex;gap:14px;align-items:flex-start">
+    <div style="font-size:22px;flex-shrink:0">
+      {% if 'delay' in n.message.lower() %}⚠️{% elif 'platform' in n.message.lower() %}🚉{% elif 'cancel' in n.message.lower() %}❌{% else %}🔔{% endif %}
+    </div>
+    <div style="flex:1">
+      <div style="font-size:14px;line-height:1.5">{{ n.message }}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;display:flex;gap:12px">
+        <span>Train #{{ n.train_id }}</span>
+        <span>{{ n.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+      </div>
+    </div>
+    {% if not n.is_read %}
+    <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:4px"></div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:60px">
+  <div style="font-size:48px;margin-bottom:12px">🔔</div>
+  <div style="font-size:16px;font-weight:600">No notifications</div>
+  <div style="color:var(--muted);margin-top:6px">You're all caught up!</div>
+</div>
+{% endif %}
+{% endblock %}

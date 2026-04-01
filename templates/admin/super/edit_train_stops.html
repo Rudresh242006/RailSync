@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Edit Stops – {{ train.train_name }}{% endblock %}
+{% block page_title %}Edit Train Stops{% endblock %}
+
+{% block extra_head %}
+<style>
+  .stop-row {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px 10px;
+    margin-bottom: 12px;
+    position: relative;
+    transition: border-color .2s;
+  }
+  .stop-row:hover { border-color: var(--border2); }
+  .stop-row .stop-badge {
+    position: absolute;
+    top: -11px;
+    left: 14px;
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    letter-spacing: .5px;
+  }
+  .stop-grid {
+    display: grid;
+    grid-template-columns: 2.5fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: end;
+  }
+  .validated { border-color: var(--green) !important; }
+  .unresolved { border-color: var(--amber) !important; }
+  .validation-msg { font-size: 11px; margin-top: 4px; }
+  .validation-msg.ok   { color: var(--green); }
+  .validation-msg.warn { color: var(--amber); }
+  .train-info-banner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+  }
+  .ti-num  { font-size: 22px; font-weight: 800; font-family: monospace; color: var(--accent); }
+  .ti-name { font-size: 16px; font-weight: 600; }
+  .ti-meta { font-size: 12px; color: var(--muted); }
+  .stop-counter {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+</style>
+
+{# ── JSON data islands – IDE sees these as opaque data, not JS ── #}
+<script type="application/json" id="stations-data">{{ stations|tojson }}</script>
+<script type="application/json" id="existing-stops-data">[
+  {% for s in existing_stops %}
+  {
+    "station_id": {{ s.station_id }},
+    "arrival":    "{{ s.arrival_time.strftime('%H:%M') if s.arrival_time else '' }}",
+    "departure":  "{{ s.departure_time.strftime('%H:%M') if s.departure_time else '' }}"
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+]</script>
+{% endblock %}
+
+{% block content %}
+<!-- Train info banner -->
+<div class="train-info-banner">
+  <div>
+    <div class="ti-num">{{ train.train_number }}</div>
+  </div>
+  <div style="height:40px;width:1px;background:var(--border)"></div>
+  <div>
+    <div class="ti-name">{{ train.train_name }}</div>
+    <div class="ti-meta">{{ train.total_seats }} seats &middot; Currently {{ existing_stops|length }} stops</div>
+  </div>
+  <div style="margin-left:auto">
+    <div class="stop-counter" id="stop-counter">{{ existing_stops|length }} stops</div>
+  </div>
+</div>
+
+<div class="card" style="max-width:820px">
+  <div class="card-header" style="margin-bottom:20px">
+    <div>
+      <div class="card-title">Route Stops Editor</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">
+        Select stops from registered stations only. Each stop is validated against the station registry.
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button type="button" onclick="addStop()" class="btn btn-ghost btn-sm">+ Add Stop</button>
+      <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost btn-sm">&#8592; Back</a>
+    </div>
+  </div>
+
+  <form method="POST" id="edit-stops-form" onsubmit="return validateAllStops()">
+    <div id="stops-container">
+      <!-- Stops rendered by JS -->
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <button type="submit" class="btn btn-primary">&#128190; Save Route &#8594;</button>
+      <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+// Read data from JSON islands – no Jinja inside <script>
+var stations      = JSON.parse(document.getElementById('stations-data').textContent);
+var existingStops = JSON.parse(document.getElementById('existing-stops-data').textContent);
+
+// Build a fast lookup map: station_id -> station object
+var stationMap = {};
+for (var i = 0; i < stations.length; i++) {
+  stationMap[stations[i].station_id] = stations[i];
+}
+
+var stopCount = 0;
+
+// ── Build the options HTML once ────────────────────────────────────
+function buildOptions(preselectedId) {
+  var html = '<option value="">— Select Station —</option>';
+  for (var i = 0; i < stations.length; i++) {
+    var s   = stations[i];
+    var sel = (preselectedId && String(s.station_id) === String(preselectedId)) ? ' selected' : '';
+    html += '<option value="' + s.station_id + '"' + sel + '>' + s.station_name + ' (' + s.city + ')</option>';
+  }
+  return html;
+}
+
+// ── Add a stop row ─────────────────────────────────────────────────
+function addStop(preselectedId, preArrival, preDeparture) {
+  stopCount++;
+  var idx = stopCount;
+
+  var labelStation = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Station</label>' : '';
+  var labelArrival = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Arrival</label>'  : '';
+  var labelDepart  = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Departure</label>': '';
+
+  var div = document.createElement('div');
+  div.className = 'stop-row';
+  div.id = 'stop-' + idx;
+
+  div.innerHTML =
+    '<span class="stop-badge">STOP ' + idx + '</span>' +
+    '<div class="stop-grid">' +
+      '<div class="form-group" style="margin-bottom:0">' +
+        labelStation +
+        '<select name="stop_station_id" required onchange="onStopChange(this,' + idx + ')">' +
+          buildOptions(preselectedId) +
+        '</select>' +
+        '<div class="validation-msg" id="vmsg-' + idx + '"></div>' +
+      '</div>' +
+      '<div class="form-group" style="margin-bottom:0">' +
+        labelArrival +
+        '<input type="time" name="arrival_time" value="' + (preArrival || '') + '">' +
+      '</div>' +
+      '<div class="form-group" style="margin-bottom:0">' +
+        labelDepart +
+        '<input type="time" name="departure_time" value="' + (preDeparture || '') + '">' +
+      '</div>' +
+      '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm" ' +
+        'style="margin-bottom:0" title="Remove stop">\u2715</button>' +
+    '</div>';
+
+  document.getElementById('stops-container').appendChild(div);
+
+  if (preselectedId) {
+    onStopChange(div.querySelector('select'), idx);
+  }
+  updateCounter();
+}
+
+// ── Remove a stop row ──────────────────────────────────────────────
+function removeStop(id) {
+  var el = document.getElementById('stop-' + id);
+  if (el) { el.remove(); }
+  renumberStops();
+  updateCounter();
+}
+
+// ── Renumber badge labels after add/remove ─────────────────────────
+function renumberStops() {
+  var rows = document.querySelectorAll('#stops-container .stop-row');
+  for (var i = 0; i < rows.length; i++) {
+    var badge = rows[i].querySelector('.stop-badge');
+    if (badge) { badge.textContent = 'STOP ' + (i + 1); }
+  }
+}
+
+// ── Update the header counter ──────────────────────────────────────
+function updateCounter() {
+  var count = document.querySelectorAll('#stops-container .stop-row').length;
+  document.getElementById('stop-counter').textContent = count + ' stop' + (count !== 1 ? 's' : '');
+}
+
+// ── Station validation on dropdown change ──────────────────────────
+function onStopChange(select, idx) {
+  var stationId = parseInt(select.value, 10);
+  var row = document.getElementById('stop-' + idx);
+  var msg = document.getElementById('vmsg-' + idx);
+
+  if (!stationId) {
+    msg.textContent = '';
+    msg.className = 'validation-msg';
+    row.classList.remove('validated', 'unresolved');
+    return;
+  }
+
+  var found = stationMap[stationId];
+  if (found) {
+    msg.textContent = '\u2713 ' + found.station_name + ', ' + found.city + ' \u00b7 ' + found.state;
+    msg.className = 'validation-msg ok';
+    row.classList.add('validated');
+    row.classList.remove('unresolved');
+  } else {
+    msg.textContent = '\u2717 Station not in registry \u2014 cannot proceed';
+    msg.className = 'validation-msg warn';
+    row.classList.remove('validated');
+    row.classList.add('unresolved');
+  }
+}
+
+// ── Form submit guard ──────────────────────────────────────────────
+function validateAllStops() {
+  var rows = document.querySelectorAll('#stops-container .stop-row');
+  if (rows.length === 0) {
+    alert('Please add at least one stop before saving.');
+    return false;
+  }
+  for (var i = 0; i < rows.length; i++) {
+    var sel = rows[i].querySelector('select[name="stop_station_id"]');
+    if (!sel || !sel.value) {
+      alert('Stop ' + (i + 1) + ': Please select a station.');
+      return false;
+    }
+    if (!stationMap[parseInt(sel.value, 10)]) {
+      alert('Stop ' + (i + 1) + ': Station not found in registry.');
+      return false;
+    }
+  }
+  return true;
+}
+
+// ── On page load: render existing stops or default 2 empty ones ────
+(function init() {
+  if (existingStops.length > 0) {
+    for (var i = 0; i < existingStops.length; i++) {
+      var s = existingStops[i];
+      addStop(s.station_id, s.arrival, s.departure);
+    }
+  } else {
+    addStop();
+    addStop();
+  }
+})();
+</script>
+{% endblock %}

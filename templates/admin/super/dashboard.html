@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Railway HQ Dashboard{% endblock %}
+{% block page_title %}Railway HQ Dashboard{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:24px">
+  <div style="font-size:24px;font-weight:700">Welcome, Super Admin</div>
+  <div style="color:var(--muted);font-size:15px">Global Railway System Overview</div>
+</div>
+
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+  <a href="{{ url_for('admin.trains') }}" style="text-decoration:none;color:inherit">
+  <div class="stat-card" style="border:1px solid rgba(var(--accent-rgb,99,102,241),0.25);cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='rgba(99,102,241,0.25)'">
+    <div class="stat-label">Total Trains</div>
+    <div class="stat-value text-primary">{{ total_trains }}</div>
+    <div class="stat-sub">Active fleet · <span style="color:var(--accent);font-size:11px">Manage →</span></div>
+  </div>
+  </a>
+  <div class="stat-card">
+    <div class="stat-label">Total Stations</div>
+    <div class="stat-value" style="color:var(--blue)">{{ total_stations }}</div>
+    <div class="stat-sub">Network spread</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Station Masters</div>
+    <div class="stat-value" style="color:var(--purple)">{{ total_masters }}</div>
+    <div class="stat-sub">{{ active_masters }} Active · {{ temp_masters }} Temp Pool · {{ leave_masters }} On Leave</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Passengers</div>
+    <div class="stat-value" style="color:var(--green)">{{ total_passengers }}</div>
+    <div class="stat-sub">Registered users</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Revenue</div>
+    <div class="stat-value" style="color:var(--accent2)">₹{{ "{:,.2f}".format(total_revenue) }}</div>
+    <div class="stat-sub">From generic bookings</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+  <!-- Recent Bookings -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Recent Network Bookings</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>User</th><th>Train</th><th>Date</th></tr></thead>
+        <tbody>
+          {% for b in recent_bookings %}
+          <tr>
+            <td class="mono">#{{ b.booking_id }}</td>
+            <td>{{ b.user.name }}</td>
+            <td>{{ b.train.train_number }}</td>
+            <td>{{ b.booking_date.strftime('%d %b %H:%M') }}</td>
+          </tr>
+          {% endfor %}
+          {% if not recent_bookings %}
+          <tr><td colspan="4" style="text-align:center;color:var(--muted)">No bookings yet.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Delayed Trains -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" style="color:var(--amber)">⚠ Active Delays</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Train</th><th>Station</th><th>Delay</th></tr></thead>
+        <tbody>
+          {% for d in delayed_trains %}
+          <tr>
+            <td><div style="font-weight:600">{{ d.train.train_name }}</div><div class="mono">{{ d.train.train_number }}</div></td>
+            <td>{{ d.current_station.station_name }}</td>
+            <td>
+              <span class="delay-pill {% if d.delay_minutes > 30 %}delay-crit{% else %}delay-warn{% endif %}">
+                +{{ d.delay_minutes }} min
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not delayed_trains %}
+          <tr><td colspan="3" style="text-align:center;color:var(--muted)">Perfect schedule! No delays.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

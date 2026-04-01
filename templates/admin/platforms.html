@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Platforms{% endblock %}
+{% block page_title %}Platform Management{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+
+  <div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div class="card-title">Platforms at {{ current_user.station.station_name }}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+        {% for p in platforms %}
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--accent2)">{{ p.platform_number }}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Platform</div>
+          {% if p.is_available %}
+          <span class="badge badge-green" style="margin-top:8px">Available</span>
+          {% else %}
+          <span class="badge badge-red" style="margin-top:8px">Occupied</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if not platforms %}
+        <div style="color:var(--muted);font-size:13px;grid-column:1/-1;text-align:center;padding:20px">
+          No platforms yet. Add one using the form.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ALLOCATIONS TABLE -->
+    {% if allocations %}
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">Current Allocations</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Train</th><th>Platform</th><th>Arrival</th><th>Departure</th></tr></thead>
+          <tbody>
+            {% for a in allocations %}
+            <tr>
+              <td>
+                <div style="font-weight:600">{{ a.train.train_name }}</div>
+                <div class="mono">{{ a.train.train_number }}</div>
+              </td>
+              <td><span style="font-size:18px;font-weight:700;color:var(--accent2)">{{ a.platform.platform_number }}</span></td>
+              <td>{{ a.arrival_time.strftime('%d %b, %H:%M') }}</td>
+              <td>{{ a.departure_time.strftime('%d %b, %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- SIDEBAR FORMS -->
+  <div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title" style="margin-bottom:14px">Add Platform</div>
+      <form method="POST" action="{{ url_for('admin.add_platform') }}">
+        <div class="form-group">
+          <label>Platform Number</label>
+          <input type="text" name="platform_number" placeholder="e.g. 1, 2A, 3B" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">Add Platform</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px">Allocate Platform</div>
+      <form method="POST" action="{{ url_for('admin.allocate_platform') }}">
+        <div class="form-group">
+          <label>Train</label>
+          <select name="train_id" required>
+            <option value="">Select train</option>
+            {% for t in trains %}
+            <option value="{{ t.train_id }}">{{ t.train_number }} — {{ t.train_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Platform</label>
+          <select name="platform_id" required>
+            <option value="">Select platform</option>
+            {% for p in platforms %}
+            <option value="{{ p.platform_id }}">Platform {{ p.platform_number }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Arrival Time</label>
+          <input type="datetime-local" name="arrival_time" required>
+        </div>
+        <div class="form-group">
+          <label>Departure Time</label>
+          <input type="datetime-local" name="departure_time" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">Allocate →</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

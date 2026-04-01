@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Passenger Manifest{% endblock %}
+{% block page_title %}Global Passenger Manifest{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:24px;">
+  <div class="card-header">
+    <div class="card-title"><i class="fa-solid fa-users" style="margin-right:8px;color:var(--accent);"></i>Lookup Train Manifest</div>
+  </div>
+  
+  <form method="GET" style="display:flex;gap:12px;align-items:flex-end;">
+    <div class="form-group" style="flex:1;margin:0;">
+      <label>Select Train</label>
+      <select name="train_id" required>
+        <option value="">-- Choose Train --</option>
+        {% for t in trains %}
+        <option value="{{ t.train_id }}" {% if request.args.get('train_id')|int == t.train_id %}selected{% endif %}>
+          {{ t.train_number }} - {{ t.train_name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="flex:1;margin:0;">
+      <label>Journey Date</label>
+      <input type="date" name="journey_date" required value="{{ request.args.get('journey_date', '') }}">
+    </div>
+    <button type="submit" class="btn btn-primary" style="height:40px;">Load Manifest</button>
+  </form>
+</div>
+
+{% if selected_train %}
+<div class="card">
+  <div class="card-header" style="justify-content:flex-start;gap:16px;">
+    <div>
+      <div style="font-size:18px;font-weight:700">{{ selected_train.train_name }}</div>
+      <div class="mono" style="color:var(--muted)">{{ selected_train.train_number }}</div>
+    </div>
+    <div style="border-left:1px solid var(--border);padding-left:16px;">
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;">Journey Date</div>
+      <div style="font-weight:600">{{ journey_date }}</div>
+    </div>
+    <div style="border-left:1px solid var(--border);padding-left:16px;margin-left:auto;">
+      <div class="badge badge-purple" style="font-size:14px;">{{ bookings|length }} Booked</div>
+    </div>
+  </div>
+  
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>PNR / Booking ID</th>
+          <th>Passenger Details</th>
+          <th>Source → Destination</th>
+          <th>Seat Assigned</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr>
+          <td class="mono" style="font-weight:600;">PNR-{{ b.booking_id }}{{ b.train_id }}</td>
+          <td>
+            <div style="font-weight:600">{{ b.user.name }}</div>
+            <div style="font-size:11px;color:var(--muted);">{{ b.user.email }}<br>{{ b.user.phone }}</div>
+          </td>
+          <td>
+            <div style="font-weight:500;">{{ b.source_station.station_name }}</div>
+            <div style="font-size:12px;color:var(--muted);">to {{ b.destination_station.station_name }}</div>
+          </td>
+          <td>
+            <span class="mono">{{ b.seat_number or 'WAITLIST' }}</span>
+          </td>
+          <td>
+            {% if b.status == 'CONFIRMED' %}
+            <span class="badge badge-green">Confirmed</span>
+            {% elif b.status == 'WAITLISTED' %}
+            <span class="badge badge-amber">Waitlisted</span>
+            {% else %}
+            <span class="badge badge-red">Cancelled</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not bookings %}
+        <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted);">No passengers booked for this train on this date.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Complete Payment - RailSync{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="col-md-5">
+        <div class="card shadow-lg border-0" style="border-radius: 1rem; overflow: hidden;">
+            <!-- Header -->
+            <div class="bg-primary text-white p-4 text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <h4 class="mb-0 fw-bold"><i class="bi bi-credit-card me-2"></i>Complete Payment</h4>
+                <p class="mb-0 mt-2 opacity-75 small">Transaction ID: {{ payment.transaction_id }}</p>
+            </div>
+            
+            <div class="card-body p-4 bg-light">
+                <!-- Summary -->
+                <div class="bg-white p-3 rounded shadow-sm mb-4 border">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted fw-semibold">Train</span>
+                        <span class="fw-bold">{{ payment.booking.train.train_number }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted fw-semibold">Seat Required</span>
+                        <span class="fw-bold text-success">{{ payment.booking.seat_number or 'WAITLIST' }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted fw-semibold">Payment Method</span>
+                        <span class="fw-bold"><i class="bi bi-wallet2 me-1"></i>{{ payment.payment_method }}</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted fw-bold">Total Payable</span>
+                        <span class="fs-3 fw-bold text-primary">₹{{ payment.amount }}</span>
+                    </div>
+                </div>
+
+                <p class="text-center text-muted small mb-4">
+                    <i class="bi bi-shield-lock text-success me-1"></i> This is a secure mock payment gateway environment.
+                </p>
+
+                <!-- Actions -->
+                <form action="{{ url_for('user.process_payment', payment_id=payment.payment_id) }}" method="POST" class="d-grid gap-3">
+                    <button type="submit" name="action" value="success" class="btn btn-success btn-lg shadow-sm fw-bold">
+                        <i class="bi bi-check-circle me-2"></i> Simulate Successful Payment
+                    </button>
+                    <button type="submit" name="action" value="fail" class="btn btn-outline-danger shadow-sm fw-bold">
+                        <i class="bi bi-x-circle me-2"></i> Simulate Payment Failure
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="text-center mt-3">
+            <a href="{{ url_for('user.my_bookings') }}" class="text-muted text-decoration-none small">
+                <i class="bi bi-arrow-left me-1"></i> Pay later (Go to Bookings)
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

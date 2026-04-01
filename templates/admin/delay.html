@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Report Delay{% endblock %}
+{% block page_title %}Report Train Delay{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:4px">Report a Delay</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">
+      AI will analyse the situation and suggest platform reallocation automatically.
+    </div>
+    <form method="POST">
+      <div class="form-group">
+        <label>Affected Train</label>
+        <select name="train_id" required>
+          <option value="">Select train</option>
+          {% for t in trains %}
+          <option value="{{ t.train_id }}">{{ t.train_number }} — {{ t.train_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="form-group">
+          <label>Delay (minutes)</label>
+          <input type="number" name="delay_minutes" placeholder="30" required min="1">
+        </div>
+        <div class="form-group">
+          <label>ETA to fix (minutes)</label>
+          <input type="number" name="eta_fixed" placeholder="60" value="60" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Problem Description</label>
+        <textarea name="problem_description" rows="3" placeholder="Describe the issue (e.g. signal failure, engine problem, track blockage…)" style="resize:vertical"></textarea>
+      </div>
+      <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:var(--amber)">
+        ⚠ Submitting will notify all passengers AND send an alert to Railway HQ (Super Admin) with problem details.
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%">
+        🤖 Report &amp; Notify HQ
+      </button>
+    </form>
+  </div>
+
+  <!-- AI RESULT PANEL -->
+  <div>
+    {% if ai_result %}
+    <div class="card" style="border-color:rgba(108,99,255,0.4)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <div style="width:36px;height:36px;background:rgba(108,99,255,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px">🤖</div>
+        <div>
+          <div style="font-weight:700;font-size:15px">AI Recommendation</div>
+          <div style="font-size:12px;color:var(--muted)">Powered by Claude</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Action</div>
+        {% if ai_result.action == 'reassign' %}
+        <span class="badge badge-amber" style="font-size:13px;padding:6px 12px">🔄 Platform Reassignment Required</span>
+        {% else %}
+        <span class="badge badge-green" style="font-size:13px;padding:6px 12px">✓ Keep Current Platform</span>
+        {% endif %}
+      </div>
+
+      {% if ai_result.suggested_platform_id %}
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Move To</div>
+        <div style="font-size:24px;font-weight:800;color:var(--accent2)">Platform {{ ai_result.suggested_platform_id }}</div>
+      </div>
+      {% endif %}
+
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Reasoning</div>
+        <div style="font-size:13px;line-height:1.6;color:var(--text)">{{ ai_result.reasoning }}</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:10px;padding:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">📢 Passenger Announcement</div>
+        <div style="font-size:13px;line-height:1.6;font-style:italic;color:var(--text)">"{{ ai_result.announcement }}"</div>
+      </div>
+
+      {% if ai_result.affected_trains %}
+      <div style="margin-top:14px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Affected Trains</div>
+        {% for tid in ai_result.affected_trains %}
+        <span class="badge badge-red" style="margin-right:4px">Train #{{ tid }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:40px;border-style:dashed">
+      <div style="font-size:40px;margin-bottom:12px">🤖</div>
+      <div style="font-weight:600;margin-bottom:6px">AI Assistant Ready</div>
+      <div style="font-size:13px;color:var(--muted)">Report a delay to get instant platform reallocation suggestions</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — RailSync</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Space Grotesk',sans-serif;background:#08090e;color:#e8eaf0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+    body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(108,99,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(108,99,255,.04) 1px,transparent 1px);background-size:60px 60px;z-index:0}
+    .card{width:100%;max-width:420px;background:#111318;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:36px;position:relative;z-index:1}
+    .logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;margin-bottom:28px}
+    .logo-icon{width:36px;height:36px;background:#6c63ff;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px}
+    h2{font-size:22px;font-weight:700;margin-bottom:6px}
+    .sub{font-size:14px;color:#8b8fa8;margin-bottom:24px}
+    .form-group{margin-bottom:14px}
+    label{display:block;font-size:12px;font-weight:600;color:#8b8fa8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+    input{width:100%;padding:10px 14px;background:#181b24;border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#e8eaf0;font-family:inherit;font-size:14px;outline:none;transition:border-color .2s}
+    input:focus{border-color:#6c63ff}
+    .btn{width:100%;padding:12px;background:#6c63ff;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s}
+    .btn:hover{background:#7c73ff}
+    .footer-link{text-align:center;font-size:13px;color:#8b8fa8;margin-top:20px}
+    .footer-link a{color:#a89cff}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><div class="logo-icon">🚆</div>RailSync</div>
+  <h2>Create account</h2>
+  <p class="sub">Join as a passenger — free forever</p>
+  <form method="POST">
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" name="name" placeholder="Arjun Kumar" required>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" name="email" placeholder="you@example.com" required>
+    </div>
+    <div class="form-group">
+      <label>Phone</label>
+      <input type="tel" name="phone" placeholder="+91 98765 43210" required>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Min. 8 characters" required minlength="8">
+    </div>
+    <button type="submit" class="btn">Create Account →</button>
+  </form>
+  <div class="footer-link">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></div>
+</div>
+</body>
+</html>

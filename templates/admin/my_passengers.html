@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}My Passengers{% endblock %}
+{% block page_title %}My Station Passengers{% endblock %}
+
+{% block extra_head %}
+<style>
+  .change-modal { position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:none;align-items:center;justify-content:center; }
+  .change-modal.open { display:flex; }
+  .change-box { background:var(--card-bg);border:1px solid var(--border2);border-radius:16px;padding:24px;width:460px;max-height:90vh;overflow-y:auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px">
+  <div style="font-size:22px;font-weight:700">Passengers at {{ station.station_name }}</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:3px">
+    Passengers whose journey <strong>starts</strong> at your station &mdash; {{ bookings|length }} booking(s)
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#Booking</th>
+          <th>Passenger</th>
+          <th>Train</th>
+          <th>Journey Date</th>
+          <th>Seat</th>
+          <th>Destination</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr>
+          <td class="mono">#{{ b.booking_id }}</td>
+          <td>
+            <div style="font-weight:600">{{ b.user.name }}</div>
+            <div style="font-size:11px;color:var(--muted)">{{ b.user.email }}</div>
+          </td>
+          <td>
+            <div style="font-weight:600">{{ b.train.train_name }}</div>
+            <div class="mono">{{ b.train.train_number }}</div>
+          </td>
+          <td>{{ b.journey_date.strftime('%d %b %Y') }}</td>
+          <td>
+            {% if b.seat_number %}
+              <span class="badge {% if b.is_window_seat %}badge-blue{% else %}badge-purple{% endif %}">{{ b.seat_number }}</span>
+            {% else %}
+              <span style="color:var(--muted)">—</span>
+            {% endif %}
+          </td>
+          <td>{{ b.destination_station.station_name }}</td>
+          <td>
+            <span class="badge badge-{% if b.status == 'CONFIRMED' %}green{% elif b.status == 'WAITLISTED' %}amber{% else %}red{% endif %}">
+              {{ b.status }}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-sm" 
+                    data-id="{{ b.booking_id }}"
+                    data-name="{{ b.user.name|e }}"
+                    data-date="{{ b.journey_date }}"
+                    data-seat="{{ b.seat_number or '' }}"
+                    data-status="{{ b.status }}"
+                    onclick="openChangeModal(this)">
+              ✏ Request Change
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not bookings %}
+        <tr>
+          <td colspan="8" style="text-align:center;color:var(--muted);padding:40px">
+            No passengers boarding at {{ station.station_name }} right now.
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Change Request Modal -->
+<div class="change-modal" id="change-modal">
+  <div class="change-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Request Booking Change</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px" id="modal-passenger-name"></div>
+
+    <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:var(--amber)">
+      ⚠ The passenger will receive a notification and must <strong>approve</strong> before the change is applied.
+    </div>
+
+    <form id="change-form" method="POST">
+      <div class="form-group">
+        <label>What to Change</label>
+        <select name="field_changed" id="field-select" onchange="updateFieldUI()">
+          <option value="journey_date">Journey Date</option>
+          <option value="seat_number">Seat Number</option>
+          <option value="status">Booking Status</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="field-date-wrap">
+        <label>New Journey Date</label>
+        <input type="date" name="new_value" id="field-date" min="{{ now().strftime('%Y-%m-%d') if now else '' }}">
+      </div>
+      <div class="form-group" id="field-seat-wrap" style="display:none">
+        <label>New Seat Number</label>
+        <input type="text" name="new_value" id="field-seat" placeholder="e.g. 3A, 5F">
+      </div>
+      <div class="form-group" id="field-status-wrap" style="display:none">
+        <label>New Status</label>
+        <select name="new_value" id="field-status">
+          <option value="CONFIRMED">CONFIRMED</option>
+          <option value="WAITLISTED">WAITLISTED</option>
+          <option value="CANCELLED">CANCELLED</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Reason for Change</label>
+        <textarea name="reason" rows="2" placeholder="Explain why this change is needed…"></textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center">Send Request to Passenger</button>
+        <button type="button" class="btn btn-ghost" onclick="closeChangeModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openChangeModal(btn) {
+  var ds = btn.dataset;
+  document.getElementById('modal-passenger-name').textContent = 'Passenger: ' + ds.name + ' \u00b7 Booking #' + ds.id;
+  document.getElementById('change-form').action = '/admin/my-passengers/request-change/' + ds.id;
+  document.getElementById('field-date').value = ds.date;
+  document.getElementById('field-seat').value = ds.seat;
+  document.getElementById('field-status').value = ds.status;
+  updateFieldUI();
+  document.getElementById('change-modal').classList.add('open');
+}
+
+function closeChangeModal() {
+  document.getElementById('change-modal').classList.remove('open');
+}
+
+function updateFieldUI() {
+  var field = document.getElementById('field-select').value;
+  document.getElementById('field-date-wrap').style.display   = field === 'journey_date' ? '' : 'none';
+  document.getElementById('field-seat-wrap').style.display   = field === 'seat_number'  ? '' : 'none';
+  document.getElementById('field-status-wrap').style.display = field === 'status'        ? '' : 'none';
+  // Sync the active input's name to "new_value"
+  document.getElementById('field-date').name   = field === 'journey_date' ? 'new_value' : '_unused_date';
+  document.getElementById('field-seat').name   = field === 'seat_number'  ? 'new_value' : '_unused_seat';
+  document.getElementById('field-status').name = field === 'status'       ? 'new_value' : '_unused_status';
+}
+
+// Close on backdrop click
+document.getElementById('change-modal').addEventListener('click', function(e) {
+  if (e.target === this) { closeChangeModal(); }
+});
+</script>
+{% endblock %}
