@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RailSync — AI-Powered Smart Railway Platform</title>
+  <title>RailSync — Smart Railway Platform</title>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -13,140 +14,312 @@
       color: #e8eaf0;
       min-height: 100vh;
       overflow-x: hidden;
+      position: relative;
     }
-    /* GRID BG */
+    
+    /* ANIMATED BACKGROUND ORBS */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: 0;
+      opacity: 0.5;
+      animation: float 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .orb-1 {
+      width: 400px; height: 400px;
+      background: #6c63ff;
+      top: -100px; left: -100px;
+      animation-delay: 0s;
+    }
+    .orb-2 {
+      width: 500px; height: 500px;
+      background: #22c55e;
+      bottom: -150px; right: -100px;
+      animation-duration: 25s;
+    }
+    .orb-3 {
+      width: 300px; height: 300px;
+      background: #a89cff;
+      top: 40%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation-duration: 15s;
+      opacity: 0.3;
+    }
+
+    @keyframes float {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(30px, 50px) scale(1.1); }
+      100% { transform: translate(-30px, 30px) scale(0.9); }
+    }
+
+    /* GRID OVERLAY */
     body::before {
       content: '';
       position: fixed; inset: 0;
       background-image:
-        linear-gradient(rgba(108,99,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(108,99,255,0.04) 1px, transparent 1px);
-      background-size: 60px 60px;
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
       z-index: 0;
+      pointer-events: none;
     }
+
+    /* TOP NAV PORTAL */
+    .nav-glass {
+      position: relative; z-index: 10;
+      padding: 20px 40px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(17, 19, 24, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .logo-mark {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+    }
+    .logo-icon {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, #6c63ff, #a89cff);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #fff;
+      box-shadow: 0 4px 15px rgba(108,99,255,0.4);
+    }
+
     .hero {
-      min-height: 100vh;
+      min-height: calc(100vh - 80px); /* minus nav height */
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       text-align: center; padding: 40px 24px;
-      position: relative; z-index: 1;
+      position: relative; z-index: 10;
     }
+    
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 16px; border-radius: 100px;
-      background: rgba(108,99,255,0.12);
+      padding: 8px 20px; border-radius: 100px;
+      background: rgba(108,99,255,0.1);
       border: 1px solid rgba(108,99,255,0.3);
-      font-size: 12px; font-weight: 600; color: #a89cff;
-      margin-bottom: 28px; letter-spacing: 0.5px;
+      font-size: 13px; font-weight: 600; color: #a89cff;
+      margin-bottom: 30px; letter-spacing: 0.5px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 20px rgba(108,99,255,0.15);
+      animation: pulse 3s infinite alternate;
     }
-    .hero-badge::before { content: '●'; font-size: 8px; color: #22c55e; }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 10px rgba(108,99,255,0.2); border-color: rgba(108,99,255,0.3); }
+      100% { box-shadow: 0 0 25px rgba(108,99,255,0.4); border-color: rgba(108,99,255,0.6); }
+    }
+    .hero-badge::before { content: '●'; font-size: 10px; color: #22c55e; text-shadow: 0 0 6px #22c55e; }
+    
     h1 {
-      font-size: clamp(42px, 7vw, 80px);
+      font-size: clamp(48px, 8vw, 84px);
       font-weight: 800; line-height: 1.05;
-      letter-spacing: -2px; margin-bottom: 20px;
+      letter-spacing: -2px; margin-bottom: 24px;
+      text-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
-    h1 span { color: #6c63ff; }
+    h1 span { 
+      background: linear-gradient(to right, #a89cff, #6c63ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
     .sub {
-      font-size: 18px; color: #8b8fa8; max-width: 520px;
-      line-height: 1.6; margin-bottom: 40px;
+      font-size: 20px; color: #a1a5bd; max-width: 600px;
+      line-height: 1.6; margin-bottom: 50px; font-weight: 400;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
     }
-    .cta-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    
+    .cta-group { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
     .btn {
-      padding: 13px 28px; border-radius: 10px;
-      font-size: 15px; font-weight: 600; font-family: inherit;
-      cursor: pointer; border: none; transition: all 0.2s;
-      text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+      padding: 16px 32px; border-radius: 12px;
+      font-size: 16px; font-weight: 600; font-family: inherit;
+      cursor: pointer; border: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-decoration: none; display: inline-flex; align-items: center; gap: 10px;
+      position: relative; overflow: hidden;
     }
-    .btn-primary { background: #6c63ff; color: #fff; }
-    .btn-primary:hover { background: #7c73ff; transform: translateY(-1px); }
-    .btn-ghost {
-      background: transparent; color: #e8eaf0;
+    
+    .btn-primary { 
+      background: linear-gradient(135deg, #6c63ff, #5046e5); 
+      color: #fff; 
+      box-shadow: 0 8px 25px rgba(108,99,255,0.3);
+    }
+    .btn-primary:hover { 
+      transform: translateY(-3px); 
+      box-shadow: 0 12px 30px rgba(108,99,255,0.5); 
+    }
+    .btn-primary::after {
+      content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: all 0.5s;
+    }
+    .btn-primary:hover::after { left: 100%; }
+
+    .btn-secondary { 
+      background: linear-gradient(135deg, #22c55e, #16a34a); 
+      color: #fff; 
+      box-shadow: 0 8px 25px rgba(34,197,94,0.3);
+    }
+    .btn-secondary:hover { 
+      transform: translateY(-3px); 
+      box-shadow: 0 12px 30px rgba(34,197,94,0.5); 
+    }
+    .btn-secondary::after {
+      content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: all 0.5s;
+    }
+    .btn-secondary:hover::after { left: 100%; }
+    
+    .btn-glass {
+      background: rgba(255,255,255,0.05); color: #e8eaf0;
       border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
     }
-    .btn-ghost:hover { background: rgba(255,255,255,0.06); }
+    .btn-glass:hover { 
+      background: rgba(255,255,255,0.1); 
+      border-color: rgba(255,255,255,0.3);
+      transform: translateY(-3px); 
+    }
 
     /* TRACK ANIMATION */
     .track-anim {
-      width: 100%; max-width: 700px;
-      margin: 60px auto 0; position: relative;
+      width: 100%; max-width: 800px;
+      margin: 80px auto 0; position: relative;
     }
     .rail-line {
       height: 2px;
-      background: rgba(108,99,255,0.3);
+      background: linear-gradient(90deg, transparent, rgba(108,99,255,0.6), transparent);
       position: relative; overflow: visible;
     }
     .train-dot {
-      width: 40px; height: 16px;
-      background: #6c63ff; border-radius: 8px;
-      position: absolute; top: -7px; left: -40px;
-      animation: ride 4s ease-in-out infinite;
-      box-shadow: 0 0 20px rgba(108,99,255,0.6);
+      width: 80px; height: 12px;
+      background: #fff; border-radius: 8px;
+      position: absolute; top: -5px; left: -80px;
+      animation: ride 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      box-shadow: 0 0 30px #6c63ff, inset 0 0 10px #6c63ff;
     }
+    .train-dot::after {
+      content:''; position: absolute;
+      right: 100%; top: 50%; transform: translateY(-50%);
+      width: 100px; height: 4px;
+      background: linear-gradient(to left, rgba(108,99,255,0.8), transparent);
+    }
+    
     @keyframes ride {
-      0%   { left: -40px; }
-      100% { left: calc(100% + 40px); }
+      0%   { left: -100px; opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { left: calc(100% + 100px); opacity: 0; }
     }
 
-    /* FEATURES */
+    /* FEATURES GRID - GLASSMORPHISM */
+    .features-wrap { position: relative; z-index: 10; padding: 40px 24px 80px; }
     .features {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      max-width: 900px; margin: 60px auto 0;
-      padding: 0 24px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      max-width: 1100px; margin: 0 auto;
     }
     .feat {
-      background: #111318;
+      background: rgba(17, 19, 24, 0.5);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 14px; padding: 20px;
+      border-radius: 20px; padding: 32px 24px;
+      transition: all 0.3s;
+      position: relative; overflow: hidden;
     }
+    .feat::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .feat:hover {
+      transform: translateY(-8px);
+      border-color: rgba(108,99,255,0.4);
+      box-shadow: 0 15px 35px rgba(0,0,0,0.4), 0 0 20px rgba(108,99,255,0.1);
+    }
+    .feat:hover::before { opacity: 1; }
+    
     .feat-icon {
-      width: 40px; height: 40px; border-radius: 10px;
-      background: rgba(108,99,255,0.15);
+      width: 50px; height: 50px; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(108,99,255,0.2), rgba(108,99,255,0.05));
+      border: 1px solid rgba(108,99,255,0.3);
       display: flex; align-items: center; justify-content: center;
-      font-size: 18px; margin-bottom: 12px;
+      font-size: 22px; color: #a89cff; margin-bottom: 20px;
     }
-    .feat h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-    .feat p { font-size: 13px; color: #8b8fa8; line-height: 1.5; }
+    .feat h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+    .feat p { font-size: 14px; color: #8b8fa8; line-height: 1.6; }
+    
+    /* ENTRANCE ANIMATION */
+    .fade-up {
+      animation: fadeInUp 0.8s ease backwards;
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
+
+<!-- Animated Orbs Background -->
+<div class="bg-orb orb-1"></div>
+<div class="bg-orb orb-2"></div>
+<div class="bg-orb orb-3"></div>
+
+<nav class="nav-glass fade-up">
+  <div class="logo-mark">
+    <div class="logo-icon"><i class="fa-solid fa-train-subway"></i></div>
+    RailSync
+  </div>
+  <a href="{{ url_for('auth.login') }}" class="btn btn-glass" style="padding: 10px 20px; font-size: 14px;">Sign In</a>
+</nav>
+
 <div class="hero">
-  <div class="hero-badge">AI-Powered · Real-time · Secure</div>
-  <h1>Smart Railway<br><span>Platform Allocation</span></h1>
-  <p class="sub">AI dynamically reallocates platforms during delays, keeps passengers informed in real time, and streamlines station operations.</p>
-  <div class="cta-group">
-    <a href="{{ url_for('auth.login') }}?role=user" class="btn btn-primary">🚆 Passenger Login</a>
-    <a href="{{ url_for('auth.register') }}" class="btn btn-ghost">Register Free</a>
-    <a href="{{ url_for('auth.login') }}?role=admin" class="btn btn-ghost">🛡 Station Master</a>
+  <div class="hero-badge fade-up delay-1">AI-Powered · Real-time · Secure</div>
+  <h1 class="fade-up delay-2">Smart Railway<br><span>Platform Allocation</span></h1>
+  <p class="sub fade-up delay-3">AI dynamically reallocates platforms during delays, computing exact network distances, and keeping passengers continuously informed.</p>
+  
+  <div class="cta-group fade-up delay-3">
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary"><i class="fa-solid fa-train"></i> Passenger Login</a>
+    <a href="{{ url_for('auth.admin_login') }}" class="btn btn-secondary"><i class="fa-solid fa-shield-halved"></i> Station Master</a>
   </div>
 
-  <div class="track-anim">
+  <div class="track-anim fade-up delay-3">
     <div class="rail-line"><div class="train-dot"></div></div>
   </div>
 </div>
 
-<div class="features">
-  <div class="feat">
-    <div class="feat-icon">🤖</div>
-    <h3>AI Platform Engine</h3>
-    <p>Claude AI reassigns platforms in real-time during disruptions, avoiding conflicts automatically.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">🔔</div>
-    <h3>Live Notifications</h3>
-    <p>Instant alerts for delays, platform changes, and booking updates — right in your dashboard.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">💳</div>
-    <h3>Secure Payments</h3>
-    <p>UPI, Card, Netbanking — fast, secure transactions with bcrypt-hashed credentials.</p>
-  </div>
-  <div class="feat">
-    <div class="feat-icon">📍</div>
-    <h3>Live Train Tracking</h3>
-    <p>Track your train's position, expected arrival, and platform in real time.</p>
+<div class="features-wrap">
+  <div class="features">
+    <div class="feat fade-up delay-1">
+      <div class="feat-icon"><i class="fa-solid fa-brain"></i></div>
+      <h3>AI Platform Engine</h3>
+      <p>Claude AI reassigns platforms in real-time during disruptions, proactively avoiding structural conflicts.</p>
+    </div>
+    <div class="feat fade-up delay-2">
+      <div class="feat-icon"><i class="fa-solid fa-bell"></i></div>
+      <h3>Live Push Alerts</h3>
+      <p>Receive instant notifications for delays, platform updates, and booking requests right in your dashboard.</p>
+    </div>
+    <div class="feat fade-up delay-3">
+      <div class="feat-icon"><i class="fa-solid fa-route"></i></div>
+      <h3>Dynamic Calculation</h3>
+      <p>Routes automatically fetch real-world track coordinates establishing exact transit timing operations.</p>
+    </div>
+    <div class="feat fade-up delay-3">
+      <div class="feat-icon"><i class="fa-solid fa-shield-check"></i></div>
+      <h3>Secure Verification</h3>
+      <p>All administrative controls, including secure master assignments, ensure robust network governance.</p>
+    </div>
   </div>
 </div>
+
 </body>
 </html>

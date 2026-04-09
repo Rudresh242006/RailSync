@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Verify Email — RailSync</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --bg: #08090e;
+      --card: rgba(14, 15, 22, 0.72);
+      --accent: #6c63ff;
+      --accent2: #a89cff;
+      --accentDeep: #5046e5;
+      --green: #22c55e;
+      --text: #e8eaf0;
+      --muted: #8b8fa8;
+      --border: rgba(255,255,255,0.08);
+      --red: #ef4444;
+      --amber: #f59e0b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+
+    /* Mesh gradient */
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 600px 600px at 15% 20%, rgba(108,99,255,0.18), transparent),
+        radial-gradient(ellipse 500px 500px at 85% 80%, rgba(168,156,255,0.10), transparent),
+        radial-gradient(ellipse 400px 400px at 50% 50%, rgba(34,197,94,0.05), transparent);
+      animation: meshShift 12s ease-in-out infinite alternate;
+    }
+    @keyframes meshShift {
+      0%   { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(15deg); }
+    }
+
+    /* Particles */
+    .particle {
+      position: fixed; border-radius: 50%; z-index: 0; pointer-events: none;
+      background: var(--accent); opacity: 0; animation: particleFloat linear infinite;
+    }
+    @keyframes particleFloat {
+      0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+      10%  { opacity: 0.5; }
+      90%  { opacity: 0.5; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    /* Grid */
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px);
+      background-size: 50px 50px; z-index: 0; pointer-events: none;
+    }
+
+    /* Card */
+    .card {
+      width: 100%; max-width: 420px;
+      background: var(--card);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border); border-radius: 24px; padding: 44px 40px;
+      position: relative; z-index: 10;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(108,99,255,0.05);
+      animation: portalIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0; transform: translateY(50px) scale(0.92);
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 20px; right: 20px; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(108,99,255,0.5), transparent);
+    }
+    @keyframes portalIn { to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    /* Email icon circle */
+    .icon-wrap {
+      width: 72px; height: 72px; margin: 0 auto 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(108,99,255,0.15), rgba(168,156,255,0.08));
+      border: 1px solid rgba(108,99,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: var(--accent2);
+      animation: iconPulse 2.5s ease-in-out infinite;
+    }
+    @keyframes iconPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(108,99,255,0.3); }
+      50%       { box-shadow: 0 0 0 14px rgba(108,99,255,0); }
+    }
+
+    h2 { font-size: 22px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 10px; line-height: 1.6; }
+    .email-chip {
+      display: inline-block; background: rgba(108,99,255,0.1);
+      border: 1px solid rgba(108,99,255,0.25); border-radius: 20px;
+      padding: 4px 14px; font-size: 13px; color: var(--accent2); font-weight: 600;
+      margin: 0 auto 28px; display: block; text-align: center; width: fit-content; margin-inline: auto;
+    }
+
+    /* OTP input boxes */
+    .otp-group {
+      display: flex; gap: 10px; justify-content: center;
+      margin: 28px 0 8px;
+    }
+    .otp-input {
+      width: 52px; height: 58px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px; color: #fff;
+      font-family: inherit; font-size: 24px; font-weight: 700; text-align: center;
+      outline: none; transition: all 0.25s; caret-color: var(--accent2);
+    }
+    .otp-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(108,99,255,0.15), 0 0 20px rgba(108,99,255,0.1);
+      background: rgba(108,99,255,0.05);
+      transform: scale(1.06);
+    }
+    .otp-input.filled {
+      border-color: rgba(108,99,255,0.4);
+      background: rgba(108,99,255,0.06);
+    }
+    .otp-input:hover {
+      border-color: rgba(108,99,255,0.5);
+      background: rgba(108,99,255,0.02);
+    }
+
+    /* Timer */
+    .timer-row {
+      display: flex; justify-content: center; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted); margin-bottom: 24px;
+    }
+    #countdown { color: var(--accent2); font-weight: 700; font-size: 13px; }
+    #countdown.urgent { color: var(--red); animation: blink 1s ease infinite; }
+    @keyframes blink { 50% { opacity: 0.4; } }
+
+    .btn-submit {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accentDeep)); color: #fff;
+      border: none; border-radius: 12px;
+      font-family: inherit; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: all 0.3s;
+      box-shadow: 0 8px 20px rgba(108,99,255,0.3);
+      position: relative; overflow: hidden;
+    }
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(108,99,255,0.45);
+    }
+    .btn-submit::after {
+      content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      transition: left 0.5s;
+    }
+    .btn-submit:hover::after { left: 120%; }
+    .btn-submit:disabled {
+      opacity: 0.5; cursor: not-allowed; transform: none;
+      box-shadow: none;
+    }
+
+    .resend-row { text-align: center; margin-top: 20px; }
+    .resend-row form { display: inline; }
+    .btn-resend {
+      background: none; border: none; cursor: pointer;
+      font-family: inherit; font-size: 13px; color: var(--muted);
+      transition: color 0.2s; padding: 0;
+    }
+    .btn-resend span { color: var(--accent2); font-weight: 600; }
+    .btn-resend:hover { color: #fff; }
+    .btn-resend span:hover { color: #fff; }
+    .btn-resend:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .back-link { text-align: center; margin-top: 14px; }
+    .back-link a { font-size: 13px; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+    .back-link a:hover { color: #fff; }
+
+    /* Alerts */
+    .alert {
+      padding: 12px 16px; border-radius: 12px;
+      font-size: 13px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
+      animation: alertIn 0.4s ease;
+    }
+    @keyframes alertIn { from { opacity: 0; transform: translateY(-10px); } }
+    .alert-danger  { background: rgba(239,68,68,0.08);   border: 1px solid rgba(239,68,68,0.25);   color: var(--red); }
+    .alert-warning { background: rgba(245,158,11,0.08);  border: 1px solid rgba(245,158,11,0.25);  color: var(--amber); }
+    .alert-success { background: rgba(34,197,94,0.08);   border: 1px solid rgba(34,197,94,0.25);   color: var(--green); }
+    .alert-info    { background: rgba(108,99,255,0.08);  border: 1px solid rgba(108,99,255,0.25);  color: var(--accent2); }
+
+    /* Success overlay */
+    .success-overlay {
+      display: none; position: absolute; inset: 0;
+      border-radius: 24px; z-index: 20;
+      background: rgba(14,15,22,0.95);
+      flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } }
+    .check-circle {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; color: #fff;
+      box-shadow: 0 8px 24px rgba(34,197,94,0.4);
+      animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn { from { transform: scale(0); opacity: 0; } }
+    .success-overlay p { color: #e8eaf0; font-weight: 600; font-size: 16px; }
+    .success-overlay small { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="bg-mesh"></div>
+<div class="particle" style="width:3px;height:3px;left:10%;animation-duration:8s;animation-delay:0s;"></div>
+<div class="particle" style="width:2px;height:2px;left:30%;animation-duration:12s;animation-delay:2s;"></div>
+<div class="particle" style="width:4px;height:4px;left:60%;animation-duration:10s;animation-delay:4s;"></div>
+<div class="particle" style="width:2px;height:2px;left:82%;animation-duration:9s;animation-delay:1s;"></div>
+
+<div class="card" id="main-card">
+
+  <!-- Success overlay (shown after correct OTP) -->
+  <div class="success-overlay" id="success-overlay">
+    <div class="check-circle"><i class="fa-solid fa-check"></i></div>
+    <p>Email Verified!</p>
+    <small>Redirecting to your dashboard…</small>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }}"><i class="fa-solid fa-circle-exclamation"></i> {{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="icon-wrap"><i class="fa-solid fa-envelope-open-text"></i></div>
+  <h2>Check Your Inbox</h2>
+  <p class="sub">We sent a 6-digit verification code to</p>
+  <div class="email-chip">{{ masked_email }}</div>
+
+  <!-- OTP Form -->
+  <form method="POST" action="{{ url_for('auth.verify_otp') }}" id="otp-form">
+    <input type="hidden" name="action" value="verify">
+    <input type="hidden" name="otp" id="otp-hidden">
+
+    <div class="otp-group" id="otp-boxes">
+      <input class="otp-input" type="text" inputmode="numeric" maxlength="1" pattern="[0-9]" id="d0" autocomplete="off">
+      <input class="otp-input" type="text" inputmode="numeric" maxlength="1" pattern="[0-9]" id="d1" autocomplete="off">
+      <input class="otp-input" type="text" inputmode="numeric" maxlength="1" pattern="[0-9]" id="d2" autocomplete="off">
+      <input class="otp-input" type="text" inputmode="numeric" maxlength="1" pattern="[0-9]" id="d3" autocomplete="off">
+      <input class="otp-input" type="text" inputmode="numeric" maxlength="1" pattern="[0-9]" id="d4" autocomplete="off">
+      <input class="otp-input" type="text" inputmode="numeric" maxlength="1" pattern="[0-9]" id="d5" autocomplete="off">
+    </div>
+
+    <div class="timer-row">
+      <i class="fa-regular fa-clock"></i>
+      Code expires in <span id="countdown">10:00</span>
+    </div>
+
+    <button type="submit" class="btn-submit" id="verify-btn" disabled>
+      Verify Email <i class="fa-solid fa-shield-check" style="margin-left:6px;"></i>
+    </button>
+  </form>
+
+  <div class="resend-row">
+    <form method="POST" action="{{ url_for('auth.verify_otp') }}">
+      <input type="hidden" name="action" value="resend">
+      <button type="submit" class="btn-resend" id="resend-btn">
+        Didn't receive it? <span>Resend code</span>
+      </button>
+    </form>
+  </div>
+
+  <div class="back-link">
+    <a href="{{ url_for('auth.register') }}"><i class="fa-solid fa-arrow-left" style="font-size:10px;margin-right:4px;"></i> Use a different email</a>
+  </div>
+</div>
+
+<script>
+// ── OTP Box Auto-focus ─────────────────────────────────────────
+const digits   = Array.from(document.querySelectorAll('.otp-input'));
+const verifyBtn = document.getElementById('verify-btn');
+const hiddenOtp = document.getElementById('otp-hidden');
+
+function getOtp() { return digits.map(d => d.value).join(''); }
+function updateVerifyBtn() {
+  const full = getOtp().length === 6;
+  verifyBtn.disabled = !full;
+}
+
+digits.forEach((box, idx) => {
+  box.addEventListener('input', e => {
+    const val = e.target.value.replace(/\D/g, '');
+    box.value = val.slice(-1);
+    box.classList.toggle('filled', box.value !== '');
+    if (box.value && idx < 5) digits[idx + 1].focus();
+    updateVerifyBtn();
+  });
+
+  box.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !box.value && idx > 0) {
+      digits[idx - 1].focus();
+      digits[idx - 1].value = '';
+      digits[idx - 1].classList.remove('filled');
+      updateVerifyBtn();
+    }
+  });
+
+  box.addEventListener('paste', e => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    pasted.split('').forEach((ch, i) => {
+      if (digits[i]) {
+        digits[i].value = ch;
+        digits[i].classList.add('filled');
+      }
+    });
+    const focusIdx = Math.min(pasted.length, 5);
+    digits[focusIdx].focus();
+    updateVerifyBtn();
+  });
+});
+
+// Inject combined OTP before form submit
+document.getElementById('otp-form').addEventListener('submit', e => {
+  hiddenOtp.value = getOtp();
+  if (hiddenOtp.value.length !== 6) { e.preventDefault(); }
+});
+
+// Auto-focus first box
+digits[0].focus();
+
+// ── Countdown Timer ────────────────────────────────────────────
+let totalSeconds = 600; // 10 min
+const countdownEl = document.getElementById('countdown');
+const resendBtn   = document.getElementById('resend-btn');
+
+function updateTimer() {
+  const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const s = (totalSeconds % 60).toString().padStart(2, '0');
+  countdownEl.textContent = `${m}:${s}`;
+  if (totalSeconds <= 60) countdownEl.classList.add('urgent');
+  if (totalSeconds <= 0) {
+    countdownEl.textContent = 'Expired';
+    verifyBtn.disabled = true;
+    verifyBtn.textContent = 'Code Expired';
+    clearInterval(timer);
+  }
+  totalSeconds--;
+}
+
+updateTimer();
+const timer = setInterval(updateTimer, 1000);
+</script>
+</body>
+</html>

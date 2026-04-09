@@ -304,9 +304,6 @@
           <a href="{{ url_for('admin.stations') }}" class="nav-item {% if request.endpoint == 'admin.stations' %}active{% endif %}">
             <span class="icon"><i class="fa-solid fa-city"></i></span> Network Stations
           </a>
-          <a href="{{ url_for('admin.analytics') }}" class="nav-item {% if request.endpoint == 'admin.analytics' %}active{% endif %}">
-            <span class="icon"><i class="fa-solid fa-chart-pie"></i></span> HQ Analytics
-          </a>
           <a href="{{ url_for('admin.chat') }}" class="nav-item {% if request.endpoint == 'admin.chat' %}active{% endif %}" id="chat-nav-item">
             <span class="icon"><i class="fa-solid fa-comments"></i></span> Admin Chat
             <span id="chat-nav-badge" class="badge badge-red" style="margin-left:auto;display:none">0</span>

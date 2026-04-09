@@ -1,9 +1,19 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from extensions import db, bcrypt
 from models import User, StationMaster
 
 auth_bp = Blueprint('auth', __name__)
+
+
+@auth_bp.after_request
+def no_cache(response):
+    """Prevent ALL auth pages from being cached by the browser.
+    This stops the back-button from showing stale login/OTP pages."""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @auth_bp.route('/')
@@ -15,6 +25,7 @@ def index():
             return redirect(url_for('admin.dashboard'))
         return redirect(url_for('user.dashboard'))
     return render_template('index.html')
+
 
 @auth_bp.route('/create_admin')
 def create_admin():
@@ -39,44 +50,57 @@ def create_admin():
     return "Admin created"
 
 
-# existing login function continues below
-
-
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
     if request.method == 'POST':
-        role = request.form.get('role', 'user')
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
 
-        if role == 'admin':
-            master = StationMaster.query.filter_by(email=email).first()
-            try:
-                pw_ok = master and bcrypt.check_password_hash(master.password_hash, password)
-            except ValueError:
-                pw_ok = False
-                flash('Admin account has a corrupted password hash. Please contact the system administrator.', 'danger')
-            if pw_ok:
-                login_user(master)
-                flash('Welcome back, Station Master!', 'success')
-                if master.role == 'super_admin':
-                    return redirect(url_for('admin.super_dashboard'))
-                return redirect(url_for('admin.dashboard'))
-            elif not pw_ok and master:
-                pass  # flash already handled
-            else:
-                flash('Invalid admin credentials.', 'danger')
-        else:
-            user = User.query.filter_by(email=email).first()
-            if user and bcrypt.check_password_hash(user.password_hash, password):
-                login_user(user)
-                flash(f'Welcome back, {user.name}!', 'success')
-                return redirect(url_for('user.dashboard'))
-            flash('Invalid email or password.', 'danger')
+        user = User.query.filter_by(email=email).first()
+        if user and bcrypt.check_password_hash(user.password_hash, password):
+            login_user(user)
+            flash(f'Welcome back, {user.name}!', 'success')
+            return redirect(url_for('user.dashboard'))
+        flash('Invalid email or password.', 'danger')
 
     return render_template('login.html')
+
+
+@auth_bp.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    if current_user.is_authenticated:
+        return redirect(url_for('auth.index'))
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        selected_role = request.form.get('role', 'admin')
+
+        master = StationMaster.query.filter_by(email=email).first()
+
+        try:
+            pw_ok = master and bcrypt.check_password_hash(master.password_hash, password)
+        except ValueError:
+            pw_ok = False
+            flash('Admin account has a corrupted password hash. Please contact the system administrator.', 'danger')
+
+        if pw_ok:
+            if selected_role == 'super_admin' and not master.is_super_admin:
+                flash('You do not have Super Admin privileges.', 'danger')
+                return redirect(url_for('auth.admin_login', role='super_admin'))
+
+            login_user(master)
+            flash('Welcome back, Station Master!', 'success')
+            if master.role == 'super_admin':
+                return redirect(url_for('admin.super_dashboard'))
+            return redirect(url_for('admin.dashboard'))
+        elif not pw_ok and master:
+            pass
+        else:
+            flash('Invalid admin credentials.', 'danger')
+
+    return render_template('master_login.html')
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
@@ -84,24 +108,116 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
-        phone = request.form.get('phone', '').strip()
+        name     = request.form.get('name', '').strip()
+        email    = request.form.get('email', '').strip().lower()
+        phone    = request.form.get('phone', '').strip()
         password = request.form.get('password', '')
 
+        if not name or not email or not phone or not password:
+            flash('All fields are required.', 'danger')
+            return render_template('register.html')
+
+        if len(password) < 8:
+            flash('Password must be at least 8 characters.', 'danger')
+            return render_template('register.html')
+
         if User.query.filter_by(email=email).first():
-            flash('Email already registered. Please login.', 'warning')
+            flash('Email already registered. Please sign in.', 'warning')
             return redirect(url_for('auth.login'))
 
-        hashed = bcrypt.generate_password_hash(password).decode('utf-8')
-        user = User(name=name, email=email, phone=phone, password_hash=hashed)
-        db.session.add(user)
-        db.session.commit()
-        login_user(user)
-        flash('Account created! Welcome to RailSync.', 'success')
-        return redirect(url_for('user.dashboard'))
+        from services.email_service import generate_otp, send_otp_email
+        import time
+
+        otp = generate_otp()
+        session['pending_registration'] = {
+            'name':          name,
+            'email':         email,
+            'phone':         phone,
+            'password_hash': bcrypt.generate_password_hash(password).decode('utf-8'),
+            'otp':           otp,
+            'otp_expires':   time.time() + 600,   # 10 minutes
+            'attempts':      0,
+        }
+
+        sent = send_otp_email(email, name, otp)
+        if not sent:
+            flash('Could not send verification email. Please try again.', 'danger')
+            return render_template('register.html')
+
+        flash(f'A 6-digit verification code has been sent to {email}.', 'info')
+        return redirect(url_for('auth.verify_otp'))
 
     return render_template('register.html')
+
+
+@auth_bp.route('/verify-otp', methods=['GET', 'POST'])
+def verify_otp():
+    """OTP confirmation step — activated after registration form submission."""
+    if current_user.is_authenticated:
+        return redirect(url_for('auth.index'))
+
+    pending = session.get('pending_registration')
+    if not pending:
+        flash('Session expired. Please register again.', 'warning')
+        return redirect(url_for('auth.register'))
+
+    import time
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'verify')
+
+        # --- Resend OTP ---
+        if action == 'resend':
+            from services.email_service import generate_otp, send_otp_email
+            new_otp = generate_otp()
+            pending['otp']         = new_otp
+            pending['otp_expires'] = time.time() + 600
+            pending['attempts']    = 0
+            session['pending_registration'] = pending
+            send_otp_email(pending['email'], pending['name'], new_otp)
+            flash('A new verification code has been sent.', 'info')
+            return redirect(url_for('auth.verify_otp'))
+
+        # --- Verify OTP ---
+        entered = request.form.get('otp', '').strip()
+
+        if time.time() > pending.get('otp_expires', 0):
+            session.pop('pending_registration', None)
+            flash('Your OTP has expired. Please register again.', 'danger')
+            return redirect(url_for('auth.register'))
+
+        if pending.get('attempts', 0) >= 5:
+            session.pop('pending_registration', None)
+            flash('Too many incorrect attempts. Please register again.', 'danger')
+            return redirect(url_for('auth.register'))
+
+        if entered == pending['otp']:
+            user = User(
+                name=pending['name'],
+                email=pending['email'],
+                phone=pending['phone'],
+                password_hash=pending['password_hash']
+            )
+            db.session.add(user)
+            db.session.commit()
+            session.pop('pending_registration', None)
+            login_user(user)
+            flash(f'Welcome aboard, {user.name}! Your account is verified. 🎉', 'success')
+            return redirect(url_for('user.dashboard'))
+        else:
+            pending['attempts'] = pending.get('attempts', 0) + 1
+            session['pending_registration'] = pending
+            remaining = 5 - pending['attempts']
+            flash(f'Incorrect code. {remaining} attempt(s) remaining.', 'danger')
+
+    # Mask email for display  e.g.  rud***@gmail.com
+    parts = pending['email'].split('@')
+    if len(parts[0]) > 3:
+        masked_email = parts[0][:3] + '•••@' + parts[1]
+    else:
+        masked_email = pending['email']
+
+    return render_template('verify_otp.html', masked_email=masked_email)
 
 
 @auth_bp.route('/logout')

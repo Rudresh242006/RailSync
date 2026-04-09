@@ -6,17 +6,18 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>Passenger Login — RailSync</title>
+  <title>Staff Login — RailSync HQ</title>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     :root {
       --bg: #08090e;
       --card: rgba(14, 15, 22, 0.7);
-      --accent: #6c63ff;
-      --accent2: #a89cff;
-      --accentDeep: #5046e5;
-      --green: #22c55e;
+      --accent: #22c55e;
+      --accent2: #4ade80;
+      --accentDeep: #16a34a;
+      --purple: #6c63ff;
+      --purple2: #a89cff;
       --text: #e8eaf0;
       --muted: #8b8fa8;
       --border: rgba(255,255,255,0.08);
@@ -36,9 +37,9 @@
     .bg-mesh {
       position: fixed; inset: 0; z-index: 0;
       background: 
-        radial-gradient(ellipse 600px 600px at 15% 20%, rgba(108,99,255,0.20), transparent),
-        radial-gradient(ellipse 500px 500px at 85% 80%, rgba(168,156,255,0.12), transparent),
-        radial-gradient(ellipse 400px 400px at 50% 50%, rgba(34,197,94,0.06), transparent);
+        radial-gradient(ellipse 600px 600px at 15% 20%, rgba(34,197,94,0.18), transparent),
+        radial-gradient(ellipse 500px 500px at 85% 80%, rgba(74,222,128,0.10), transparent),
+        radial-gradient(ellipse 400px 400px at 50% 50%, rgba(108,99,255,0.06), transparent);
       animation: meshShift 12s ease-in-out infinite alternate;
     }
     @keyframes meshShift {
@@ -62,8 +63,8 @@
     /* Grid lines */
     body::before {
       content: ''; position: fixed; inset: 0;
-      background-image: linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px);
+      background-image: linear-gradient(rgba(34,197,94,0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(34,197,94,0.03) 1px, transparent 1px);
       background-size: 50px 50px; z-index: 0; pointer-events: none;
     }
 
@@ -75,14 +76,13 @@
       border: 1px solid var(--border);
       border-radius: 24px; padding: 44px 40px;
       position: relative; z-index: 10;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(108,99,255,0.05);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(34,197,94,0.05);
       animation: portalIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       opacity: 0; transform: translateY(50px) scale(0.92);
     }
-    /* Top gradient shimmer */
     .card::before {
       content: ''; position: absolute; top: 0; left: 20px; right: 20px; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(108,99,255,0.5), transparent);
+      background: linear-gradient(90deg, transparent, rgba(34,197,94,0.5), transparent);
     }
     @keyframes portalIn {
       to { opacity: 1; transform: translateY(0) scale(1); }
@@ -94,19 +94,43 @@
     }
     .logo-icon {
       width: 42px; height: 42px; border-radius: 12px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      background: linear-gradient(135deg, var(--accentDeep), var(--accent));
       display: flex; align-items: center; justify-content: center;
       font-size: 18px; color: #fff;
-      box-shadow: 0 6px 20px rgba(108,99,255,0.4);
+      box-shadow: 0 6px 20px rgba(34,197,94,0.4);
       animation: logoGlow 3s ease-in-out infinite alternate;
     }
     @keyframes logoGlow {
-      from { box-shadow: 0 6px 20px rgba(108,99,255,0.3); }
-      to { box-shadow: 0 6px 30px rgba(108,99,255,0.6); }
+      from { box-shadow: 0 6px 20px rgba(34,197,94,0.3); }
+      to { box-shadow: 0 6px 30px rgba(34,197,94,0.6); }
     }
     
     h2 { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 6px; }
     .sub { font-size: 14px; color: var(--muted); text-align: center; margin-bottom: 32px; }
+
+    /* ROLE TABS */
+    .role-tabs {
+      position: relative;
+      display: grid; grid-template-columns: 1fr 1fr;
+      background: rgba(0,0,0,0.25); border-radius: 14px;
+      margin-bottom: 28px; padding: 4px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .role-tab {
+      padding: 11px; border-radius: 10px; cursor: pointer;
+      background: transparent; color: var(--muted);
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      border: none; transition: all 0.3s; position: relative; z-index: 2;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .role-tab.active { color: #fff; }
+    .tab-slider {
+      position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px);
+      background: rgba(34,197,94,0.2); border-radius: 10px;
+      border: 1px solid rgba(34,197,94,0.25);
+      box-shadow: 0 2px 12px rgba(34,197,94,0.15);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1;
+    }
 
     .form-group { margin-bottom: 22px; position: relative; }
     label { 
@@ -125,12 +149,12 @@
     }
     input:focus { 
       border-color: var(--accent); 
-      box-shadow: 0 0 0 3px rgba(108,99,255,0.12), 0 0 20px rgba(108,99,255,0.08); 
-      background: rgba(108,99,255,0.04); 
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.12), 0 0 20px rgba(34,197,94,0.08); 
+      background: rgba(34,197,94,0.04); 
     }
     input:hover {
-      border-color: rgba(108,99,255,0.6);
-      background: rgba(108,99,255,0.02);
+      border-color: rgba(34,197,94,0.6);
+      background: rgba(34,197,94,0.02);
     }
     input::placeholder { color: rgba(255,255,255,0.2); }
     input:-webkit-autofill,
@@ -151,17 +175,17 @@
 
     .btn-submit {
       width: 100%; padding: 14px;
-      background: linear-gradient(135deg, var(--accent), var(--accentDeep)); color: #fff;
+      background: linear-gradient(135deg, var(--accentDeep), var(--accent)); color: #fff;
       border: none; border-radius: 12px;
       font-family: inherit; font-size: 15px; font-weight: 700;
       cursor: pointer; margin-top: 8px;
       transition: all 0.3s; 
-      box-shadow: 0 8px 20px rgba(108,99,255,0.3);
+      box-shadow: 0 8px 20px rgba(34,197,94,0.3);
       position: relative; overflow: hidden;
     }
     .btn-submit:hover {
       transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgba(108,99,255,0.45);
+      box-shadow: 0 12px 28px rgba(34,197,94,0.45);
     }
     .btn-submit::after {
       content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
@@ -182,14 +206,6 @@
     .footer-links a:hover { color: #fff; }
     .footer-links a:hover span { color: #fff; }
 
-    .divider {
-      display: flex; align-items: center; gap: 12px;
-      margin: 24px 0 20px; color: var(--muted); font-size: 12px;
-    }
-    .divider::before, .divider::after {
-      content: ''; flex: 1; height: 1px; background: var(--border);
-    }
-
     .alert {
       padding: 12px 16px; border-radius: 12px;
       font-size: 13px; margin-bottom: 20px;
@@ -199,8 +215,8 @@
     @keyframes alertIn { from { opacity: 0; transform: translateY(-10px); } }
     .alert-danger { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--red); }
     .alert-warning { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); color: var(--amber); }
-    .alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: var(--green); }
-    .alert-info { background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.25); color: var(--accent2); }
+    .alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: var(--accent); }
+    .alert-info { background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.25); color: var(--purple2); }
 
     /* Stagger form fields */
     .stagger-1 { animation: fieldIn 0.6s ease backwards; animation-delay: 0.3s; }
@@ -214,19 +230,19 @@
 <div class="bg-mesh"></div>
 
 <!-- Floating particles -->
-<div class="particle" style="width:3px;height:3px;left:10%;animation-duration:8s;animation-delay:0s;"></div>
-<div class="particle" style="width:2px;height:2px;left:25%;animation-duration:12s;animation-delay:2s;"></div>
-<div class="particle" style="width:4px;height:4px;left:55%;animation-duration:10s;animation-delay:4s;"></div>
-<div class="particle" style="width:2px;height:2px;left:75%;animation-duration:9s;animation-delay:1s;"></div>
-<div class="particle" style="width:3px;height:3px;left:90%;animation-duration:11s;animation-delay:3s;"></div>
+<div class="particle" style="width:3px;height:3px;left:12%;animation-duration:8s;animation-delay:0s;"></div>
+<div class="particle" style="width:2px;height:2px;left:30%;animation-duration:12s;animation-delay:2s;"></div>
+<div class="particle" style="width:4px;height:4px;left:60%;animation-duration:10s;animation-delay:4s;"></div>
+<div class="particle" style="width:2px;height:2px;left:80%;animation-duration:9s;animation-delay:1s;"></div>
+<div class="particle" style="width:3px;height:3px;left:92%;animation-duration:11s;animation-delay:3s;"></div>
 
 <div class="card">
   <div class="logo">
-    <div class="logo-icon"><i class="fa-solid fa-train-subway"></i></div>
-    RailSync
+    <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+    Railway HQ
   </div>
-  <h2>Passenger Portal</h2>
-  <p class="sub">Sign in to book, track, and manage your trips</p>
+  <h2>Staff Portal</h2>
+  <p class="sub">Authenticated access for railway personnel</p>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in messages %}
@@ -234,36 +250,50 @@
     {% endfor %}
   {% endwith %}
 
-  <form method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
-    <input type="hidden" name="role" value="user">
+  <div class="role-tabs stagger-1">
+    <div class="tab-slider" id="tab-slider"></div>
+    <button type="button" class="role-tab active" id="tab-admin" onclick="setRole('admin')"><i class="fa-solid fa-user-tie"></i> Station Master</button>
+    <button type="button" class="role-tab" id="tab-super" onclick="setRole('super_admin')"><i class="fa-solid fa-globe"></i> Super Admin</button>
+  </div>
+
+  <form method="POST" action="{{ url_for('auth.admin_login') }}" autocomplete="off">
+    <input type="hidden" name="role" id="role-input" value="{{ request.args.get('role', 'admin') }}">
     
-    <div class="form-group stagger-1">
-      <label><i class="fa-solid fa-envelope"></i> Email Address</label>
-      <input type="email" name="email" placeholder="Email Address" required autocomplete="off">
+    <div class="form-group stagger-2">
+      <label><i class="fa-solid fa-envelope"></i> Staff Email</label>
+      <input type="email" name="email" placeholder="Staff Email" required autocomplete="off">
     </div>
     
     <div class="form-group stagger-2">
-      <label><i class="fa-solid fa-lock"></i> Password</label>
+      <label><i class="fa-solid fa-lock"></i> Secure Passphrase</label>
       <div class="pwd-wrap">
-        <input type="password" name="password" id="password-input" placeholder="Password" required autocomplete="new-password" style="padding-right:42px;">
+        <input type="password" name="password" id="password-input" placeholder="Secure Passphrase" required autocomplete="new-password" style="padding-right:42px;">
         <button type="button" class="pwd-toggle" onclick="togglePassword()"><i class="fa-solid fa-eye" id="pwd-icon"></i></button>
       </div>
     </div>
     
     <div class="stagger-3">
-      <button type="submit" class="btn-submit">Sign In <i class="fa-solid fa-arrow-right" style="margin-left:6px;"></i></button>
+      <button type="submit" class="btn-submit">Authenticate <i class="fa-solid fa-shield-check" style="margin-left:6px;"></i></button>
     </div>
   </form>
 
-  <div class="divider">or</div>
-
   <div class="footer-links">
-    <a href="{{ url_for('auth.register') }}">Don't have an account? <span>Create one →</span></a>
-    <a href="{{ url_for('auth.admin_login') }}">Railway staff? <span>Staff Login →</span></a>
+    <a href="{{ url_for('auth.login') }}"><i class="fa-solid fa-arrow-left" style="font-size:11px;margin-right:4px;"></i> Back to <span>Passenger Portal</span></a>
   </div>
 </div>
 
 <script>
+function setRole(role) {
+  document.getElementById('role-input').value = role;
+  const isAdmin = role === 'admin';
+  
+  document.getElementById('tab-admin').classList.toggle('active', isAdmin);
+  document.getElementById('tab-super').classList.toggle('active', !isAdmin);
+  document.getElementById('tab-slider').style.transform = isAdmin ? 'translateX(0)' : 'translateX(100%)';
+  
+  localStorage.setItem('railSyncMasterRole', role);
+}
+
 function togglePassword() {
   const pwd = document.getElementById('password-input');
   const icon = document.getElementById('pwd-icon');
@@ -275,6 +305,12 @@ function togglePassword() {
     icon.className = 'fa-solid fa-eye';
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    let urlRole = new URLSearchParams(window.location.search).get('role');
+    if (urlRole !== 'super_admin') urlRole = 'admin';
+    setRole(urlRole);
+});
 </script>
 </body>
 </html>

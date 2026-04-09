@@ -515,6 +515,91 @@ def validate_stop():
 
 
 # ──────────────────────────────────────────────────────────────────
+# API: Calculate Journey (Distance & Time via AI)
+# ──────────────────────────────────────────────────────────────────
+def ai_estimate_journey(st1, st2):
+    client = get_ai_client()
+    prompt = f"""You are a railway expert system.
+What is the approximate realistic railway track distance (in km) and the standard train travel time (in minutes) between these two stations in India:
+Station 1: {st1.station_name}, {st1.city}
+Station 2: {st2.station_name}, {st2.city}
+
+Please provide a highly realistic estimation for a standard express train based on real-world Indian Railway data.
+DO NOT provide any text, just return a raw JSON object exactly in this format:
+{{
+  "distance_km": <number>,
+  "estimated_minutes": <number>
+}}"""
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = response.content[0].text
+        raw = raw.strip().lstrip('```json').rstrip('```').strip()
+        data = json.loads(raw)
+        return int(data['distance_km']), int(data['estimated_minutes'])
+    except Exception as e:
+        print("AI Distance Error:", e)
+        return None, None
+
+@admin_bp.route('/api/calculate-journey')
+@login_required
+@admin_required
+def calculate_journey():
+    from_id = request.args.get('from_id', type=int)
+    to_id = request.args.get('to_id', type=int)
+    if not from_id or not to_id:
+        return jsonify({'error': 'Missing from_id or to_id'}), 400
+        
+    st1 = Station.query.get(from_id)
+    st2 = Station.query.get(to_id)
+    if not st1 or not st2:
+        return jsonify({'error': 'Invalid station ID'}), 404
+        
+    # Try AI Estimation
+    dist_km, est_min = ai_estimate_journey(st1, st2)
+    
+    # Fallback if AI fails
+    if dist_km is None:
+        import math
+        def haversine(lat1, lon1, lat2, lon2):
+            R = 6371
+            dlat = math.radians(lat2-lat1)
+            dlon = math.radians(lon2-lon1)
+            a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlon/2)**2
+            return R * 2 * math.asin(math.sqrt(a))
+            
+        def get_coords(station):
+            query = urllib.parse.quote(f"{station.station_name} railway station {station.city}")
+            url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1"
+            req = urllib.request.Request(url, headers={'User-Agent': 'RailSyncApp/1.0'})
+            try:
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    data = json.loads(resp.read())
+                    if data:
+                        return float(data[0]['lat']), float(data[0]['lon'])
+            except:
+                pass
+            return None, None
+            
+        lat1, lon1 = get_coords(st1)
+        lat2, lon2 = get_coords(st2)
+        if lat1 and lat2:
+            base_dist = haversine(lat1, lon1, lat2, lon2)
+            dist_km = int(base_dist * 1.25)
+            est_min = int((dist_km / 60.0) * 60)
+        else:
+            dist_km = 50
+            est_min = 50
+            
+    return jsonify({
+        'distance_km': dist_km,
+        'estimated_minutes': est_min
+    })
+
+# ──────────────────────────────────────────────────────────────────
 # Edit Train Stops (Super Admin)
 # ──────────────────────────────────────────────────────────────────
 @admin_bp.route('/super/trains/edit-stops/<int:train_id>', methods=['GET', 'POST'])

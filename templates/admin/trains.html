@@ -12,7 +12,9 @@
       </span>
     </div>
   </div>
+  {% if current_user.role == 'super_admin' %}
   <a href="{{ url_for('admin.add_train') }}" class="btn btn-primary">+ Add Train</a>
+  {% endif %}
 </div>
 
 <div class="card">
@@ -51,16 +53,18 @@
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               {% if current_user.role == 'super_admin' %}
               <a href="{{ url_for('admin.edit_train_stops', train_id=train.train_id) }}" class="btn btn-ghost btn-sm">✏ Edit Stops</a>
-              {% endif %}
               <form method="POST" action="{{ url_for('admin.remove_train', train_id=train.train_id) }}" onsubmit="return confirm('Remove this train? All related data will be deleted.')">
                 <button type="submit" class="btn btn-danger btn-sm">Remove</button>
               </form>
+              {% else %}
+              <span style="color:var(--muted);font-size:12px;">No actions available</span>
+              {% endif %}
             </div>
           </td>
         </tr>
         {% endfor %}
         {% if not trains %}
-        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px">No trains found. <a href="{{ url_for('admin.add_train') }}">Add one →</a></td></tr>
+        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px">No trains found. {% if current_user.role == 'super_admin' %}<a href="{{ url_for('admin.add_train') }}">Add one →</a>{% endif %}</td></tr>
         {% endif %}
       </tbody>
     </table>

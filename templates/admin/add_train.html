@@ -226,12 +226,77 @@ function validateStopSelect(select, idx) {
     hint.className = 'stop-hint ok';
     select.classList.remove('invalid-stop');
     select.classList.add('valid-stop');
+    
+    // Auto-calculate time based on previous stop
+    calculateTimeForStop(select, stationId);
   } else {
     hint.textContent = '\u2717 Station not found in registry';
     hint.className = 'stop-hint err';
     select.classList.remove('valid-stop');
     select.classList.add('invalid-stop');
   }
+}
+
+function calculateTimeForStop(selectElement, currentStationId) {
+  var currentRow = selectElement.closest('.stop-row');
+  var prevRow = currentRow.previousElementSibling;
+  if (!prevRow || !prevRow.classList.contains('stop-row')) return;
+  
+  var prevSelect = prevRow.querySelector('select[name="stop_station_id"]');
+  var prevDepartInput = prevRow.querySelector('input[name="departure_time"]');
+  if (!prevSelect || !prevDepartInput) return;
+  
+  var prevStationId = parseInt(prevSelect.value);
+  var prevDepartTime = prevDepartInput.value;
+  if (!prevStationId || !prevDepartTime) return; // need previous values to calculate
+  
+  var currentArrivalInput = currentRow.querySelector('input[name="arrival_time"]');
+  var currentDepartInput = currentRow.querySelector('input[name="departure_time"]');
+  if (!currentArrivalInput || !currentDepartInput) return;
+  
+  // Do not overwrite existing values to allow users to edit them
+  if (currentArrivalInput.value && currentDepartInput.value) return;
+
+  var hint = currentRow.querySelector('.stop-hint');
+  var baseHint = hint ? hint.textContent : '';
+  if (hint) {
+      hint.textContent = '\u231B Calculating distance & time...';
+      hint.classList.remove('ok');
+      hint.style.color = 'var(--amber)';
+  }
+
+  fetch('/admin/api/calculate-journey?from_id=' + prevStationId + '&to_id=' + currentStationId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.estimated_minutes && !data.error) {
+        var parts = prevDepartTime.split(':');
+        var date = new Date(2000, 0, 1, parseInt(parts[0]), parseInt(parts[1]));
+        
+        // calculate arrival
+        date.setMinutes(date.getMinutes() + data.estimated_minutes);
+        var arrHH = String(date.getHours()).padStart(2, '0');
+        var arrMM = String(date.getMinutes()).padStart(2, '0');
+        if (!currentArrivalInput.value) { currentArrivalInput.value = arrHH + ':' + arrMM; }
+        
+        // calculate departure (arrival + 10 mins approx)
+        date.setMinutes(date.getMinutes() + 10);
+        var depHH = String(date.getHours()).padStart(2, '0');
+        var depMM = String(date.getMinutes()).padStart(2, '0');
+        if (!currentDepartInput.value) { currentDepartInput.value = depHH + ':' + depMM; }
+        
+        if (hint) {
+            var prefixFree = baseHint.replace(/^[\u2713\u2717]\s*/, '');
+            hint.textContent = '\u2713 ' + prefixFree + ' (' + data.distance_km + ' km track)';
+            hint.classList.add('ok');
+            hint.style.color = '';
+        }
+      } else {
+        if (hint) { hint.textContent = baseHint; hint.classList.add('ok'); hint.style.color = ''; }
+      }
+    })
+    .catch(function() { 
+        if (hint) { hint.textContent = baseHint; hint.classList.add('ok'); hint.style.color = ''; }
+    });
 }
 
 function validateForm() {
