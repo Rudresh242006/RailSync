@@ -38,7 +38,10 @@ class Station(db.Model):
     station_name = db.Column(db.String(150), nullable=False)
     city = db.Column(db.String(100), nullable=False)
     state = db.Column(db.String(100), nullable=False)
-    is_junction = db.Column(db.Boolean, default=False)   # ← NEW: junction stations wait 1hr
+    is_junction = db.Column(db.Boolean, default=False)
+    # Persisted coordinates — populated once, never re-fetched from OSM
+    latitude  = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
 
 
 class StationMaster(db.Model, UserMixin):
@@ -68,12 +71,16 @@ class Train(db.Model):
     train_number = db.Column(db.String(10), unique=True, nullable=False)
     train_name = db.Column(db.String(150), nullable=False)
     total_seats = db.Column(db.Integer, nullable=False)
+    # Round-trip settings
+    turnaround_minutes = db.Column(db.Integer, default=360)   # real-world wait at each terminal (mins)
+    anim_speed_scale   = db.Column(db.Float,   default=8.0)   # animation-seconds per real-hour of wait
 
     routes = db.relationship('TrainRoute', backref='train', lazy=True, cascade='all, delete-orphan')
     statuses = db.relationship('TrainStatus', backref='train', lazy=True, cascade='all, delete-orphan')
     bookings = db.relationship('Booking', backref='train', lazy=True)
     notifications = db.relationship('Notification', backref='train', lazy=True)
     platform_allocations = db.relationship('PlatformAllocation', backref='train', lazy=True, cascade='all, delete-orphan')
+
 
 
 class Platform(db.Model):
@@ -112,6 +119,9 @@ class TrainStatus(db.Model):
     expected_departure = db.Column(db.DateTime, nullable=True)
     delay_minutes = db.Column(db.Integer, default=0)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Journey scheduling — set by Super Admin
+    journey_start_datetime = db.Column(db.DateTime, nullable=True)   # when train left its current origin
+    journey_direction      = db.Column(db.String(10), default='idle') # 'forward' | 'reverse' | 'idle'
 
     current_station = db.relationship('Station', backref='train_statuses')
 

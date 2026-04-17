@@ -358,10 +358,24 @@ def platforms():
 def add_platform():
     station = current_user.station
     number = request.form.get('platform_number', '').strip()
+
+    if not number:
+        flash('Platform number cannot be empty.', 'danger')
+        return redirect(url_for('admin.platforms'))
+
+    # Check for duplicate platform number at this station
+    existing = Platform.query.filter_by(
+        station_id=station.station_id,
+        platform_number=number
+    ).first()
+    if existing:
+        flash(f'Platform {number} already exists at this station.', 'danger')
+        return redirect(url_for('admin.platforms'))
+
     p = Platform(station_id=station.station_id, platform_number=number)
     db.session.add(p)
     db.session.commit()
-    flash(f'Platform {number} added.', 'success')
+    flash(f'Platform {number} added successfully.', 'success')
     return redirect(url_for('admin.platforms'))
 
 
@@ -370,88 +384,98 @@ def add_platform():
 @admin_required
 def allocate_platform():
     station = current_user.station
-
-    train_id = request.form.get('train_id', type=int)
+    train_id   = request.form.get('train_id',   type=int)
     platform_id = request.form.get('platform_id', type=int)
 
-    arrival = datetime.strptime(request.form['arrival_time'], '%Y-%m-%dT%H:%M')
-    departure = datetime.strptime(request.form['departure_time'], '%Y-%m-%dT%H:%M')
+    if not train_id or not platform_id:
+        flash('Please select both a train and a platform.', 'danger')
+        return redirect(url_for('admin.platforms'))
 
-    # 🚨 CHECK FOR CONFLICTS
+    # Auto-fetch arrival/departure from the schedule set by Super Admin
+    route_stop = TrainRoute.query.filter_by(
+        train_id=train_id,
+        station_id=station.station_id
+    ).first()
+
+    if not route_stop:
+        flash('This train does not stop at your station. Cannot allocate.', 'danger')
+        return redirect(url_for('admin.platforms'))
+
+    # Use today's date + the scheduled time from TrainRoute
+    today = datetime.utcnow().date()
+    arrival   = datetime.combine(today, route_stop.arrival_time)   if route_stop.arrival_time   else datetime.utcnow()
+    departure = datetime.combine(today, route_stop.departure_time) if route_stop.departure_time else datetime.utcnow()
+
+    # Check for conflicts on the chosen platform
     conflict = PlatformAllocation.query.filter(
         PlatformAllocation.platform_id == platform_id,
-        PlatformAllocation.station_id == station.station_id,
-        PlatformAllocation.arrival_time < departure,
+        PlatformAllocation.station_id  == station.station_id,
+        PlatformAllocation.arrival_time   < departure,
         PlatformAllocation.departure_time > arrival
-        ).first()
+    ).first()
 
     if conflict:
-        # 🔍 Find another free platform
+        # Auto-find a free platform
         free_platforms = Platform.query.filter(
-            Platform.station_id == station.station_id,
+            Platform.station_id  == station.station_id,
             Platform.platform_id != platform_id
         ).all()
 
         best_platform = None
-        min_gap = None
-
         for p in free_platforms:
-            allocations = PlatformAllocation.query.filter(
-                PlatformAllocation.platform_id == p.platform_id,
-                PlatformAllocation.station_id == station.station_id
-                ).all()
-
-            conflict_found = False
-            for a in allocations:
-                if arrival < a.departure_time and departure > a.arrival_time:
-                    conflict_found = True
-                    break
-
-            if not conflict_found:
-                gap = 0
-                for a in allocations:
-                    gap += abs((arrival - a.departure_time).total_seconds())
-
-                if min_gap is None or gap < min_gap:
-                    min_gap = gap
-                    best_platform = p
+            has_conflict = PlatformAllocation.query.filter(
+                PlatformAllocation.platform_id    == p.platform_id,
+                PlatformAllocation.station_id     == station.station_id,
+                PlatformAllocation.arrival_time   < departure,
+                PlatformAllocation.departure_time > arrival
+            ).first()
+            if not has_conflict:
+                best_platform = p
+                break
 
         if best_platform:
             alloc = PlatformAllocation(
-                train_id=train_id,
-                station_id=station.station_id,
+                train_id=train_id, station_id=station.station_id,
                 platform_id=best_platform.platform_id,
-                arrival_time=arrival,
-                departure_time=departure
+                arrival_time=arrival, departure_time=departure
             )
-
             db.session.add(alloc)
             db.session.commit()
-
-            flash(
-                f'⚠️ Conflict detected! Auto-assigned to Platform {best_platform.platform_number}',
-                'warning'
-            )
-            return redirect(url_for('admin.platforms'))
+            flash(f'Conflict detected! Auto-assigned to Platform {best_platform.platform_number}.', 'warning')
         else:
-            flash('❌ No free platforms available at this time!', 'danger')
-            return redirect(url_for('admin.platforms'))
+            flash('No free platforms available at this time!', 'danger')
+        return redirect(url_for('admin.platforms'))
 
-    # ✅ NO CONFLICT → NORMAL ASSIGN
+    # No conflict — assign directly
+    # Remove any existing allocation for this train at this station first
+    PlatformAllocation.query.filter_by(
+        train_id=train_id, station_id=station.station_id
+    ).delete()
     alloc = PlatformAllocation(
-        train_id=train_id,
-        station_id=station.station_id,
+        train_id=train_id, station_id=station.station_id,
         platform_id=platform_id,
-        arrival_time=arrival,
-        departure_time=departure
+        arrival_time=arrival, departure_time=departure
     )
-
     db.session.add(alloc)
     db.session.commit()
-
     flash('Platform allocated successfully.', 'success')
     return redirect(url_for('admin.platforms'))
 
+
+@admin_bp.route('/platforms/delete/<int:platform_id>', methods=['POST'])
+@login_required
+@admin_required
+def delete_platform(platform_id):
+    station = current_user.station
+    p = Platform.query.filter_by(
+        platform_id=platform_id, station_id=station.station_id
+    ).first_or_404()
+    # Remove allocations tied to this platform first
+    PlatformAllocation.query.filter_by(platform_id=platform_id).delete()
+    db.session.delete(p)
+    db.session.commit()
+    flash(f'Platform {p.platform_number} deleted.', 'success')
+    return redirect(url_for('admin.platforms'))
 
 # ──────────────────────────────────────────────────────────────────
 # API: Check train number / name duplicates (real-time)
@@ -544,60 +568,204 @@ DO NOT provide any text, just return a raw JSON object exactly in this format:
         print("AI Distance Error:", e)
         return None, None
 
+# ── Hardcoded coordinates for major Indian railway stations ──────────────
+# Format: "station name lowercase" → (lat, lon)
+_KNOWN_STATIONS = {
+    # Major hubs
+    "new delhi":            (28.6420, 77.2201),
+    "delhi":                (28.6420, 77.2201),
+    "mumbai central":       (18.9706, 72.8193),
+    "mumbai":               (18.9696, 72.8195),
+    "cst":                  (18.9400, 72.8356),
+    "chhatrapati shivaji":  (18.9400, 72.8356),
+    "chennai central":      (13.0827, 80.2707),
+    "chennai":              (13.0827, 80.2707),
+    "kolkata":              (22.5726, 88.3639),
+    "howrah":               (22.5852, 88.3426),
+    "sealdah":              (22.5661, 88.3697),
+    "bangalore city":       (12.9767, 77.5713),
+    "krantivira sangolli rayanna": (12.9767, 77.5713),
+    "bengaluru":            (12.9767, 77.5713),
+    "bangalore":            (12.9767, 77.5713),
+    "hyderabad":            (17.4065, 78.4772),
+    "secunderabad":         (17.4344, 78.5013),
+    "kacheguda":            (17.3850, 78.4867),
+    "ahmedabad":            (23.0225, 72.5714),
+    "pune":                 (18.5286, 73.8742),
+    "jaipur":               (26.9124, 75.7873),
+    "lucknow":              (26.8467, 80.9462),
+    "kanpur central":       (26.4499, 80.3319),
+    "kanpur":               (26.4499, 80.3319),
+    "varanasi":             (25.3176, 82.9739),
+    "patna":                (25.5941, 85.1376),
+    "bhopal":               (23.2599, 77.4126),
+    "indore":               (22.7196, 75.8577),
+    "nagpur":               (21.1458, 79.0882),
+    "surat":                (21.1702, 72.8311),
+    "visakhapatnam":        (17.6868, 83.2185),
+    "vijayawada":           (16.5062, 80.6480),
+    "coimbatore":           (11.0168, 76.9558),
+    "madurai":              (9.9195,  78.1194),
+    "trichy":               (10.7909, 78.7047),
+    "tiruchirapalli":       (10.7909, 78.7047),
+    "salem":                (11.6643, 78.1460),
+    "ernakulam":            (9.9816,  76.2999),
+    "kochi":                (9.9816,  76.2999),
+    "thiruvananthapuram":   (8.5241,  76.9366),
+    "trivandrum":           (8.5241,  76.9366),
+    "kozhikode":            (11.2588, 75.7804),
+    "calicut":              (11.2588, 75.7804),
+    "mangalore":            (12.9141, 74.8560),
+    "hubli":                (15.3647, 75.1240),
+    "mysore":               (12.2958, 76.6394),
+    "mysuru":               (12.2958, 76.6394),
+    "guwahati":             (26.1158, 91.7086),
+    "bhubaneswar":          (20.2961, 85.8245),
+    "cuttack":              (20.4625, 85.8830),
+    "raipur":               (21.2514, 81.6296),
+    "bilaspur":             (22.0797, 82.1391),
+    "allahabad":            (25.4358, 81.8463),
+    "prayagraj":            (25.4358, 81.8463),
+    "agra":                 (27.1767, 78.0081),
+    "agra cantt":           (27.1767, 78.0081),
+    "mathura":              (27.4924, 77.6737),
+    "meerut":               (28.9845, 77.7064),
+    "amritsar":             (31.6340, 74.8723),
+    "ludhiana":             (30.9010, 75.8573),
+    "chandigarh":           (30.7333, 76.7794),
+    "jammu":                (32.7266, 74.8570),
+    "jodhpur":              (26.2389, 73.0243),
+    "udaipur":              (24.5854, 73.7125),
+    "ajmer":                (26.4521, 74.6446),
+    "bikaner":              (28.0229, 73.3119),
+    "kota":                 (25.2138, 75.8648),
+    "gwalior":              (26.2183, 78.1828),
+    "jabalpur":             (23.1815, 79.9864),
+    "nashik":               (19.9975, 73.7898),
+    "aurangabad":           (19.8762, 75.3433),
+    "solapur":              (17.6805, 75.9064),
+    "ranchi":               (23.3441, 85.3096),
+    "jamshedpur":           (22.8046, 86.2029),
+    "dhanbad":              (23.7957, 86.4304),
+    "silchar":              (24.8333, 92.7789),
+    "siliguri":             (26.7271, 88.3953),
+    "new jalpaiguri":       (26.7139, 88.4485),
+    "jammu tawi":           (32.7266, 74.8570),
+    "shirdi":               (19.7675, 74.4773),
+}
+
+# Runtime OSM coordinate cache: {station_id: (lat, lon)}
+_coord_cache = {}
+
+
+def _lookup_station_coords(station_id, station_name, city):
+    """
+    Multi-strategy coordinate lookup:
+    1. Runtime cache (instant)
+    2. Hardcoded known-stations table (instant)
+    3. OSM Nominatim with multiple query strategies
+    Returns (lat, lon) or (None, None)
+    """
+    if station_id in _coord_cache:
+        return _coord_cache[station_id]
+
+    # Strategy 1: exact name match in hardcoded table
+    key = station_name.strip().lower()
+    if key in _KNOWN_STATIONS:
+        coords = _KNOWN_STATIONS[key]
+        _coord_cache[station_id] = coords
+        print(f"[COORDS] {station_name} -> hardcoded table ({coords})")
+        return coords
+
+    # Strategy 2: partial match (city name)
+    city_key = city.strip().lower()
+    if city_key in _KNOWN_STATIONS:
+        coords = _KNOWN_STATIONS[city_key]
+        _coord_cache[station_id] = coords
+        print(f"[COORDS] {station_name} -> city match '{city_key}' ({coords})")
+        return coords
+
+    # Strategy 3: OSM Nominatim with multiple query formats
+    queries = [
+        f"{station_name} railway station, {city}, India",
+        f"{station_name} station, India",
+        f"{station_name}, {city}, India",
+        f"{city}, India",
+    ]
+
+    for q in queries:
+        url = ("https://nominatim.openstreetmap.org/search?q="
+               + urllib.parse.quote(q)
+               + "&format=json&limit=1&countrycodes=IN")
+        req = urllib.request.Request(url, headers={'User-Agent': 'RailSync/3.0'})
+        try:
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read())
+                if data:
+                    lat = float(data[0]['lat'])
+                    lon = float(data[0]['lon'])
+                    coords = (lat, lon)
+                    _coord_cache[station_id] = coords
+                    print(f"[COORDS] {station_name} -> OSM query '{q}' -> ({lat:.4f}, {lon:.4f})")
+                    return coords
+        except Exception as e:
+            print(f"[COORDS] OSM failed for '{q}': {e}")
+            continue
+
+    print(f"[COORDS] FAILED all strategies for: {station_name}, {city}")
+    return (None, None)
+
+
 @admin_bp.route('/api/calculate-journey')
 @login_required
 @admin_required
 def calculate_journey():
+    import math
+    import threading
+
     from_id = request.args.get('from_id', type=int)
-    to_id = request.args.get('to_id', type=int)
+    to_id   = request.args.get('to_id',   type=int)
     if not from_id or not to_id:
         return jsonify({'error': 'Missing from_id or to_id'}), 400
-        
+
     st1 = Station.query.get(from_id)
     st2 = Station.query.get(to_id)
     if not st1 or not st2:
         return jsonify({'error': 'Invalid station ID'}), 404
-        
-    # Try AI Estimation
-    dist_km, est_min = ai_estimate_journey(st1, st2)
-    
-    # Fallback if AI fails
-    if dist_km is None:
-        import math
-        def haversine(lat1, lon1, lat2, lon2):
-            R = 6371
-            dlat = math.radians(lat2-lat1)
-            dlon = math.radians(lon2-lon1)
-            a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlon/2)**2
-            return R * 2 * math.asin(math.sqrt(a))
-            
-        def get_coords(station):
-            query = urllib.parse.quote(f"{station.station_name} railway station {station.city}")
-            url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1"
-            req = urllib.request.Request(url, headers={'User-Agent': 'RailSyncApp/1.0'})
-            try:
-                with urllib.request.urlopen(req, timeout=3) as resp:
-                    data = json.loads(resp.read())
-                    if data:
-                        return float(data[0]['lat']), float(data[0]['lon'])
-            except:
-                pass
-            return None, None
-            
-        lat1, lon1 = get_coords(st1)
-        lat2, lon2 = get_coords(st2)
-        if lat1 and lat2:
-            base_dist = haversine(lat1, lon1, lat2, lon2)
-            dist_km = int(base_dist * 1.25)
-            est_min = int((dist_km / 60.0) * 60)
-        else:
-            dist_km = 50
-            est_min = 50
-            
-    return jsonify({
-        'distance_km': dist_km,
-        'estimated_minutes': est_min
-    })
+
+    result = {}
+
+    def fetch1():
+        result['from'] = _lookup_station_coords(from_id, st1.station_name, st1.city)
+
+    def fetch2():
+        result['to'] = _lookup_station_coords(to_id, st2.station_name, st2.city)
+
+    # Run both lookups in parallel
+    t1 = threading.Thread(target=fetch1)
+    t2 = threading.Thread(target=fetch2)
+    t1.start(); t2.start()
+    t1.join(timeout=8); t2.join(timeout=8)
+
+    lat1, lon1 = result.get('from', (None, None))
+    lat2, lon2 = result.get('to',   (None, None))
+
+    print(f"[JOURNEY] {st1.station_name}({lat1},{lon1}) → {st2.station_name}({lat2},{lon2})")
+
+    if lat1 and lat2:
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = (math.sin(dlat/2)**2
+             + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2)
+        straight_km = 2 * 6371 * math.asin(math.sqrt(a))
+        rail_km  = round(straight_km * 1.30, 1)
+        est_min  = int((rail_km / 60.0) * 60)
+        print(f"[JOURNEY] straight={straight_km:.1f}km → rail={rail_km}km → {est_min}min")
+        return jsonify({'distance_km': rail_km, 'estimated_minutes': est_min, 'source': 'calculated'})
+
+    # If we truly could not find either station, return an error (not a fake 80km)
+    return jsonify({'error': f'Could not find coordinates for: {st1.station_name} or {st2.station_name}'}), 422
+
 
 # ──────────────────────────────────────────────────────────────────
 # Edit Train Stops (Super Admin)
@@ -1419,3 +1587,372 @@ def master_notif_mark_read(notif_id):
     n.is_read = True
     db.session.commit()
     return jsonify({'ok': True})
+
+
+# ══════════════════════════════════════════════════════════════════
+# LIVE STATUS — India Map with animated train routes
+# ══════════════════════════════════════════════════════════════════
+
+# A visually distinct palette for up to 20 trains
+_TRAIN_COLORS = [
+    '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#f9844a',
+    '#a29bfe', '#fd79a8', '#00cec9', '#fdcb6e', '#e17055',
+    '#74b9ff', '#55efc4', '#fab1a0', '#dfe6e9', '#81ecec',
+    '#b2bec3', '#ff7675', '#00b894', '#0984e3', '#e84393',
+]
+
+def _get_station_coords_for_map(station):
+    """
+    Return (lat, lon) for a station.
+    Uses persisted DB columns first (instant). Falls back to OSM once and saves.
+    """
+    if station.latitude and station.longitude:
+        return station.latitude, station.longitude
+
+    # First time: lookup and persist so we never call OSM again
+    if station.station_name == 'Unassigned / Temporary Pool':
+        return None, None
+    lat, lon = _lookup_station_coords(station.station_id, station.station_name, station.city)
+    if lat and lon:
+        station.latitude  = lat
+        station.longitude = lon
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    return lat, lon
+
+
+@admin_bp.route('/super/live-status')
+@login_required
+@super_admin_required
+def live_status():
+    return render_template('admin/super/live_status.html')
+
+
+
+@admin_bp.route('/api/live-status')
+@login_required
+@super_admin_required
+def live_status_api():
+    """
+    Returns JSON with trains + stations for the Live Status map.
+
+    PERFORMANCE DESIGN:
+    - All DB queries run BEFORE processing (no lazy loads inside loops).
+    - TrainStatus is fetched in ONE bulk query → dict lookup (no N+1).
+    - Train routes are sorted once per train using already-loaded data.
+    - Station coords come ONLY from Station.latitude/longitude (DB columns).
+      → No OSM / no network calls at all during this request.
+      → Stations without persisted coordinates are simply skipped (no block).
+    - _get_station_coords_for_map() is still called so that the first-ever
+      request for a station triggers a one-time OSM lookup & DB persist,
+      but that only happens for new stations that have never been geocoded.
+      After that single save, every subsequent call is instant (DB read).
+    """
+    import math
+    from sqlalchemy.orm import joinedload
+
+    # ── 1. Bulk-load everything in as few queries as possible ──────────
+    # Trains with routes + station eagerly loaded (avoids N+1 lazy loads)
+    trains = (Train.query
+              .options(
+                  joinedload(Train.routes).joinedload(TrainRoute.station)
+              )
+              .all())
+
+    # All stations (single query)
+    all_stations = Station.query.all()
+
+    # All TrainStatus records → dict keyed by train_id (ONE query, no loop)
+    all_statuses = {s.train_id: s for s in TrainStatus.query.all()}
+
+    # ── 2. Build station coord map (DB only — instant, no network) ──────
+    station_coords = {}
+    pool_id = None
+
+    for s in all_stations:
+        if s.station_name == 'Unassigned / Temporary Pool':
+            pool_id = s.station_id
+            continue  # skip pool station
+
+        # Fast path: coords already in DB
+        if s.latitude and s.longitude:
+            station_coords[s.station_id] = {'lat': s.latitude, 'lon': s.longitude}
+        else:
+            # Slow path: first-ever load — lookup + persist so next call is instant
+            lat, lon = _get_station_coords_for_map(s)
+            if lat and lon:
+                station_coords[s.station_id] = {'lat': lat, 'lon': lon}
+            # else: station has no coords at all → silently skip
+
+    # ── 3. Build stations output (background dots) ──────────────────────
+    stations_out = []
+    for s in all_stations:
+        if s.station_id == pool_id:
+            continue
+        if s.station_id in station_coords:
+            c = station_coords[s.station_id]
+            stations_out.append({
+                'station_id': s.station_id,
+                'name': s.station_name,
+                'city': s.city,
+                'state': s.state,
+                'is_junction': s.is_junction,
+                'lat': c['lat'],
+                'lon': c['lon'],
+            })
+
+    # ── 4. Build trains output ──────────────────────────────────────────
+    trains_out = []
+    for i, train in enumerate(trains):
+        color = _TRAIN_COLORS[i % len(_TRAIN_COLORS)]
+
+        # Routes are already eagerly loaded — no extra queries
+        routes = sorted(train.routes, key=lambda r: r.stop_number)
+
+        stops = []
+        total_route_minutes = 0
+        total_dist = 0.0
+        for j, r in enumerate(routes):
+            if r.station_id not in station_coords:
+                continue  # skip stations without coords (instant, no network)
+            c = station_coords[r.station_id]
+            if j > 0 and r.distance_km:
+                total_dist += r.distance_km
+            if r.estimated_travel_min:
+                total_route_minutes += r.estimated_travel_min
+            stops.append({
+                'stop_number':    r.stop_number,
+                'station_id':     r.station_id,
+                'name':           r.station.station_name,
+                'city':           r.station.city,
+                'is_junction':    r.station.is_junction,
+                'lat':            c['lat'],
+                'lon':            c['lon'],
+                'arrival':        r.arrival_time.strftime('%H:%M')   if r.arrival_time   else None,
+                'departure':      r.departure_time.strftime('%H:%M') if r.departure_time else None,
+                'distance_km':    r.distance_km,
+                'cumulative_km':  round(total_dist, 1),
+                'travel_min':     r.estimated_travel_min,
+            })
+
+        if len(stops) < 2:
+            continue  # skip trains with insufficient mapped stops
+
+        # Status — dict lookup, no extra query (pre-fetched above)
+        status            = all_statuses.get(train.train_id)
+        current_station_id = status.current_station_id     if status else stops[0]['station_id']
+        delay_minutes      = status.delay_minutes           if status else 0
+        journey_start_dt   = status.journey_start_datetime if status else None
+        journey_direction  = status.journey_direction       if status else 'idle'
+
+        # Compute total route distance using haversine (pure math, no network)
+        total_route_km = 0.0
+        prev_lat = prev_lon = None
+        for stop in stops:
+            if prev_lat is not None:
+                dlat = math.radians(stop['lat'] - prev_lat)
+                dlon = math.radians(stop['lon'] - prev_lon)
+                a = (math.sin(dlat / 2) ** 2
+                     + math.cos(math.radians(prev_lat))
+                     * math.cos(math.radians(stop['lat']))
+                     * math.sin(dlon / 2) ** 2)
+                total_route_km += 2 * 6371 * math.asin(math.sqrt(a)) * 1.30
+            prev_lat, prev_lon = stop['lat'], stop['lon']
+
+        trains_out.append({
+            'train_id':               train.train_id,
+            'train_number':           train.train_number,
+            'train_name':             train.train_name,
+            'total_seats':            train.total_seats,
+            'color':                  color,
+            'current_station_id':     current_station_id,
+            'delay_minutes':          delay_minutes,
+            'total_route_km':         round(total_route_km, 1),
+            'total_route_minutes':    total_route_minutes,
+            'turnaround_minutes':     train.turnaround_minutes or 360,
+            'anim_speed_scale':       float(train.anim_speed_scale or 8.0),
+            'journey_start_datetime': journey_start_dt.isoformat() if journey_start_dt else None,
+            'journey_direction':      journey_direction,
+            'stops':                  stops,
+        })
+
+    return jsonify({'trains': trains_out, 'stations': stations_out})
+
+# ────────────────────────────────────────────────────────────────
+# API: Schedule a train journey (Super Admin)
+# ────────────────────────────────────────────────────────────────
+@admin_bp.route('/super/trains/<int:train_id>/schedule', methods=['POST'])
+@login_required
+@super_admin_required
+def schedule_train(train_id):
+    """
+    Set or update a train's journey start datetime and direction.
+    Body JSON: {
+        start_datetime: 'YYYY-MM-DDTHH:MM',   # local IST
+        direction: 'forward' | 'reverse' | 'idle'
+    }
+    """
+    from datetime import datetime as dt
+    train = Train.query.get_or_404(train_id)
+    body  = request.get_json(force=True, silent=True) or {}
+
+    start_str = body.get('start_datetime', '').strip()
+    direction  = body.get('direction', 'forward').strip()
+
+    if direction not in ('forward', 'reverse', 'idle'):
+        return jsonify({'ok': False, 'error': 'direction must be forward | reverse | idle'}), 400
+
+    # Parse datetime (ISO format from HTML datetime-local input)
+    start_dt = None
+    if start_str and direction != 'idle':
+        try:
+            start_dt = dt.fromisoformat(start_str)
+        except ValueError:
+            return jsonify({'ok': False, 'error': f'Invalid datetime: {start_str}'}), 400
+
+    # Upsert TrainStatus
+    status = TrainStatus.query.filter_by(train_id=train_id).first()
+    if not status:
+        # Create one pointing to the first stop
+        first_route = (TrainRoute.query
+                       .filter_by(train_id=train_id)
+                       .order_by(TrainRoute.stop_number)
+                       .first())
+        if not first_route:
+            return jsonify({'ok': False, 'error': 'Train has no route stops'}), 400
+        status = TrainStatus(
+            train_id=train_id,
+            current_station_id=first_route.station_id,
+        )
+        db.session.add(status)
+
+    status.journey_start_datetime = start_dt
+    status.journey_direction      = direction
+    if direction == 'idle':
+        status.journey_start_datetime = None
+
+    db.session.commit()
+    return jsonify({
+        'ok': True,
+        'train_id': train_id,
+        'journey_start_datetime': status.journey_start_datetime.isoformat() if status.journey_start_datetime else None,
+        'journey_direction': status.journey_direction,
+    })
+
+
+# ────────────────────────────────────────────────────────────────
+# API: Set turnaround settings for a train (Super Admin)
+# ────────────────────────────────────────────────────────────────
+@admin_bp.route('/super/trains/<int:train_id>/set-turnaround', methods=['POST'])
+@login_required
+@super_admin_required
+def set_turnaround(train_id):
+    """Update turnaround_minutes and anim_speed_scale for a train."""
+    train = Train.query.get_or_404(train_id)
+
+    # Frontend always sends JSON; fall back to form data just in case
+    body = request.get_json(silent=True, force=True)
+    if not body:
+        body = request.form.to_dict()
+
+    turnaround = body.get('turnaround_minutes')
+    scale      = body.get('anim_speed_scale')
+
+    try:
+        if turnaround is not None:
+            train.turnaround_minutes = max(0, int(turnaround))
+        if scale is not None:
+            train.anim_speed_scale = max(0.5, float(scale))
+    except (ValueError, TypeError) as e:
+        return jsonify({'ok': False, 'error': f'Invalid value: {e}'}), 400
+
+    db.session.commit()
+    return jsonify({
+        'ok': True,
+        'train_id': train_id,
+        'turnaround_minutes': train.turnaround_minutes,
+        'anim_speed_scale': float(train.anim_speed_scale)
+    })
+
+
+
+# ══════════════════════════════════════════════════════════════════
+# HISTORY SECTION
+# ══════════════════════════════════════════════════════════════════
+@admin_bp.route('/super/history')
+@login_required
+@super_admin_required
+def history():
+    # Users
+    all_users = User.query.all()
+    # "Current Users" -> Passengers with at least one CONFIRMED booking
+    current_users = User.query.filter(User.bookings.any(status='CONFIRMED')).all()
+    
+    current_user_ids = {u.user_id for u in current_users}
+    old_users = [u for u in all_users if u.user_id not in current_user_ids]
+    
+    # Station Masters
+    all_masters = StationMaster.query.all()
+    pool = Station.query.filter_by(station_name='Unassigned / Temporary Pool').first()
+    pool_id = pool.station_id if pool else None
+    
+    # Permanent: not in pool and not super_admin
+    permanent_masters = [m for m in all_masters if not m.is_super_admin and m.station_id != pool_id]
+    # Temporary: in pool and not super_admin
+    temp_masters = [m for m in all_masters if not m.is_super_admin and m.station_id == pool_id]
+    
+    super_admins = [m for m in all_masters if m.is_super_admin]
+    
+    return render_template(
+        'admin/super/history.html',
+        all_users=all_users,
+        current_users=current_users,
+        old_users=old_users,
+        all_masters=all_masters,
+        permanent_masters=permanent_masters,
+        temp_masters=temp_masters,
+        super_admins=super_admins
+    )
+
+
+@admin_bp.route('/super/history/change-password', methods=['POST'])
+@login_required
+@super_admin_required
+def change_password():
+    from extensions import bcrypt
+
+    user_type    = request.form.get('user_type')
+    user_id      = request.form.get('target_id', type=int)
+    new_password = request.form.get('new_password', '').strip()
+
+    if not new_password or len(new_password) < 4:
+        return jsonify({'ok': False, 'error': 'Password must be at least 4 characters long.'}), 400
+
+    # Super admins may only change Station Master passwords, not passenger accounts
+    if user_type == 'user':
+        return jsonify({'ok': False, 'error': 'Access denied: Super Admin cannot change passenger passwords.'}), 403
+
+    hashed = bcrypt.generate_password_hash(new_password).decode('utf-8')
+
+    if user_type == 'user':
+        target = User.query.get(user_id)
+        if not target:
+            return jsonify({'ok': False, 'error': 'User not found.'}), 404
+        target.password_hash = hashed
+        db.session.commit()
+        return jsonify({'ok': True, 'message': f"Password updated for {target.name}"})
+
+    elif user_type == 'master':
+        target = StationMaster.query.get(user_id)
+        if not target:
+            return jsonify({'ok': False, 'error': 'Station Master not found.'}), 404
+        if target.is_super_admin:
+            return jsonify({'ok': False, 'error': "Cannot change another Super Admin's password."}), 403
+        
+        target.password_hash = hashed
+        db.session.commit()
+        return jsonify({'ok': True, 'message': f"Password updated for {target.name}"})
+
+    return jsonify({'ok': False, 'error': 'Invalid request.'}), 400

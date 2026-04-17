@@ -8,60 +8,63 @@
     background: var(--bg3);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 14px 16px 10px;
-    margin-bottom: 12px;
+    padding: 18px 16px 14px;
+    margin-bottom: 14px;
     position: relative;
-    transition: border-color .2s;
+    transition: border-color .2s, box-shadow .2s;
   }
   .stop-row:hover { border-color: var(--border2); }
   .stop-row .stop-badge {
-    position: absolute;
-    top: -11px;
-    left: 14px;
-    background: var(--accent);
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 20px;
-    letter-spacing: .5px;
+    position: absolute; top: -11px; left: 14px;
+    background: var(--accent); color: white;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 10px; border-radius: 20px; letter-spacing: .5px;
   }
+  .stop-row.calculating { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(245,158,11,0.1); }
+  .stop-row.validated   { border-color: var(--green); }
+
   .stop-grid {
     display: grid;
-    grid-template-columns: 2.5fr 1fr 1fr auto;
+    grid-template-columns: 2.5fr 1fr 1fr 1fr auto;
     gap: 10px;
     align-items: end;
   }
-  .validated { border-color: var(--green) !important; }
-  .unresolved { border-color: var(--amber) !important; }
+  .col-labels {
+    display: grid;
+    grid-template-columns: 2.5fr 1fr 1fr 1fr auto;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .col-label {
+    font-size: 10px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .8px;
+    padding-left: 2px;
+  }
+  .wait-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .wait-row input { font-size: 13px; text-align: center; }
+  .wait-label { font-size: 9px; color: var(--muted); text-align: center; margin-top: 3px; letter-spacing: .5px; }
+
   .validation-msg { font-size: 11px; margin-top: 4px; }
   .validation-msg.ok   { color: var(--green); }
   .validation-msg.warn { color: var(--amber); }
+  .validation-msg.calc { color: var(--amber); }
+
   .train-info-banner {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 20px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 24px;
   }
   .ti-num  { font-size: 22px; font-weight: 800; font-family: monospace; color: var(--accent); }
   .ti-name { font-size: 16px; font-weight: 600; }
   .ti-meta { font-size: 12px; color: var(--muted); }
   .stop-counter {
-    background: var(--bg);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
+    background: var(--bg); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 6px 14px;
+    font-size: 13px; font-weight: 600; color: var(--text);
   }
+  input[readonly] { opacity: 0.7; cursor: not-allowed; }
 </style>
 
-{# ── JSON data islands – IDE sees these as opaque data, not JS ── #}
 <script type="application/json" id="stations-data">{{ stations|tojson }}</script>
 <script type="application/json" id="existing-stops-data">[
   {% for s in existing_stops %}
@@ -75,11 +78,8 @@
 {% endblock %}
 
 {% block content %}
-<!-- Train info banner -->
 <div class="train-info-banner">
-  <div>
-    <div class="ti-num">{{ train.train_number }}</div>
-  </div>
+  <div><div class="ti-num">{{ train.train_number }}</div></div>
   <div style="height:40px;width:1px;background:var(--border)"></div>
   <div>
     <div class="ti-name">{{ train.train_name }}</div>
@@ -90,12 +90,12 @@
   </div>
 </div>
 
-<div class="card" style="max-width:820px">
+<div class="card" style="max-width:940px">
   <div class="card-header" style="margin-bottom:20px">
     <div>
       <div class="card-title">Route Stops Editor</div>
       <div style="font-size:12px;color:var(--muted);margin-top:3px">
-        Select stops from registered stations only. Each stop is validated against the station registry.
+        Set Arrival &amp; Waiting time → Departure auto-calculated. Changing any time cascades to all stops below.
       </div>
     </div>
     <div style="display:flex;gap:8px">
@@ -104,11 +104,16 @@
     </div>
   </div>
 
-  <form method="POST" id="edit-stops-form" onsubmit="return validateAllStops()">
-    <div id="stops-container">
-      <!-- Stops rendered by JS -->
-    </div>
+  <div class="col-labels" id="col-headers" style="display:none;padding:0 0 2px 4px">
+    <span class="col-label">Station</span>
+    <span class="col-label">Arrival</span>
+    <span class="col-label">Waiting Time</span>
+    <span class="col-label">Departure</span>
+    <span></span>
+  </div>
 
+  <form method="POST" id="edit-stops-form" onsubmit="return validateAndSave()">
+    <div id="stops-container"></div>
     <div style="display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
       <button type="submit" class="btn btn-primary">&#128190; Save Route &#8594;</button>
       <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost">Cancel</a>
@@ -116,12 +121,69 @@
   </form>
 </div>
 
+<!-- Turnaround Settings Card -->
+<div class="card" style="max-width:940px;margin-top:20px">
+  <div class="card-header" style="margin-bottom:16px">
+    <div>
+      <div class="card-title">🔁 Return Journey Settings</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">
+        Configure turnaround time at each terminal and animation display speed.
+      </div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:end">
+    <!-- Turnaround Time -->
+    <div>
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:8px">
+        Turnaround Time at Each Terminal
+      </label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="flex:1">
+          <input type="number" id="ta-hours" min="0" max="48" placeholder="6"
+                 value="{{ (train.turnaround_minutes // 60) if train.turnaround_minutes else 6 }}"
+                 style="text-align:center">
+          <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">HOURS</div>
+        </div>
+        <div style="flex:1">
+          <input type="number" id="ta-mins" min="0" max="59" placeholder="0"
+                 value="{{ (train.turnaround_minutes % 60) if train.turnaround_minutes else 0 }}"
+                 style="text-align:center">
+          <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">MINUTES</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">
+        Train waits this long at source &amp; destination before reversing.
+      </div>
+    </div>
+    <!-- Animation Scale -->
+    <div>
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:8px">
+        Animation Wait Scale
+      </label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="ta-scale" min="0.5" max="60" step="0.5" placeholder="8"
+               value="{{ train.anim_speed_scale if train.anim_speed_scale else 8.0 }}"
+               style="flex:1;text-align:center">
+        <span style="font-size:12px;color:var(--muted);white-space:nowrap">sec / hr</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">
+        How many animation-seconds = 1 real hour of turnaround wait.
+        (e.g. 8 = 6hr wait shows as ~48 sec pause on live map)
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center">
+    <button type="button" onclick="saveTurnaround()" class="btn btn-primary" id="ta-save-btn">
+      &#128190; Save Return Settings
+    </button>
+    <span id="ta-save-msg" style="font-size:12px;color:var(--green);display:none">✓ Saved!</span>
+  </div>
+</div>
+
 <script>
-// Read data from JSON islands – no Jinja inside <script>
 var stations      = JSON.parse(document.getElementById('stations-data').textContent);
 var existingStops = JSON.parse(document.getElementById('existing-stops-data').textContent);
 
-// Build a fast lookup map: station_id -> station object
 var stationMap = {};
 for (var i = 0; i < stations.length; i++) {
   stationMap[stations[i].station_id] = stations[i];
@@ -129,7 +191,10 @@ for (var i = 0; i < stations.length; i++) {
 
 var stopCount = 0;
 
-// ── Build the options HTML once ────────────────────────────────────
+// Cache: "fromSid_toSid" → travel minutes (persists for entire page session)
+var _travelCache = {};
+
+// ── Build select options ─────────────────────────────────────────────
 function buildOptions(preselectedId) {
   var html = '<option value="">— Select Station —</option>';
   for (var i = 0; i < stations.length; i++) {
@@ -140,194 +205,315 @@ function buildOptions(preselectedId) {
   return html;
 }
 
-// ── Add a stop row ─────────────────────────────────────────────────
+// ── Add a stop row ───────────────────────────────────────────────────
 function addStop(preselectedId, preArrival, preDeparture) {
   stopCount++;
-  var idx = stopCount;
+  var idx     = stopCount;
+  var isFirst = (document.querySelectorAll('#stops-container .stop-row').length === 0);
 
-  var labelStation = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Station</label>' : '';
-  var labelArrival = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Arrival</label>'  : '';
-  var labelDepart  = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Departure</label>': '';
+  // Pre-compute waiting time from existing arrival/departure
+  var preWaitH = '', preWaitM = '';
+  if (preArrival && preDeparture) {
+    var aP = preArrival.split(':'), dP = preDeparture.split(':');
+    var diff = (parseInt(dP[0])*60 + parseInt(dP[1])) - (parseInt(aP[0])*60 + parseInt(aP[1]));
+    if (diff < 0) diff += 24 * 60; // Handle midnight crossing
+    if (diff > 0) { preWaitH = String(Math.floor(diff/60)); preWaitM = String(diff % 60); }
+  }
 
   var div = document.createElement('div');
-  div.className = 'stop-row';
-  div.id = 'stop-' + idx;
+  div.className  = 'stop-row';
+  div.id         = 'stop-' + idx;
+  div.dataset.idx = idx;
 
   div.innerHTML =
     '<span class="stop-badge">STOP ' + idx + '</span>' +
     '<div class="stop-grid">' +
+
+      // Station
       '<div class="form-group" style="margin-bottom:0">' +
-        labelStation +
         '<select name="stop_station_id" required onchange="onStopChange(this,' + idx + ')">' +
           buildOptions(preselectedId) +
         '</select>' +
         '<div class="validation-msg" id="vmsg-' + idx + '"></div>' +
       '</div>' +
+
+      // Arrival
       '<div class="form-group" style="margin-bottom:0">' +
-        labelArrival +
-        '<input type="time" name="arrival_time" value="' + (preArrival || '') + '">' +
+        '<input type="time" name="arrival_time" id="arr-' + idx + '" value="' + (preArrival || '') + '"' +
+          (isFirst ? '' : ' readonly') +
+          ' onchange="onArrivalChange(' + idx + ')">' +
+        '<div style="font-size:9px;color:var(--muted);margin-top:3px" id="arr-label-' + idx + '">' +
+          (isFirst ? 'Set manually' : 'Auto-calculated') +
+        '</div>' +
       '</div>' +
+
+      // Waiting time
       '<div class="form-group" style="margin-bottom:0">' +
-        labelDepart +
-        '<input type="time" name="departure_time" value="' + (preDeparture || '') + '">' +
+        '<div class="wait-row">' +
+          '<div>' +
+            '<input type="number" id="wait-h-' + idx + '" min="0" max="23" placeholder="0" value="' + preWaitH + '"' +
+              ' oninput="onWaitChange(' + idx + ')">' +
+            '<div class="wait-label">HRS</div>' +
+          '</div>' +
+          '<div>' +
+            '<input type="number" id="wait-m-' + idx + '" min="0" max="59" placeholder="0" value="' + preWaitM + '"' +
+              ' oninput="onWaitChange(' + idx + ')">' +
+            '<div class="wait-label">MIN</div>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
-      '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm" ' +
-        'style="margin-bottom:0" title="Remove stop">\u2715</button>' +
+
+      // Departure (readonly, auto-calculated)
+      '<div class="form-group" style="margin-bottom:0">' +
+        '<input type="time" name="departure_time" id="dep-' + idx + '" value="' + (preDeparture || '') + '" readonly>' +
+        '<div style="font-size:9px;color:var(--green);margin-top:3px">Arrival + wait</div>' +
+      '</div>' +
+
+      // Remove
+      '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm"' +
+        ' style="margin-bottom:0" title="Remove">&#x2715;</button>' +
+
     '</div>';
 
   document.getElementById('stops-container').appendChild(div);
+  document.getElementById('col-headers').style.display = 'grid';
 
-  if (preselectedId) {
-    onStopChange(div.querySelector('select'), idx);
-  }
+  if (preselectedId) onStopChange(div.querySelector('select'), idx);
+  if (preArrival && (preWaitH || preWaitM)) onWaitChange(idx);
+
   updateCounter();
 }
 
-// ── Remove a stop row ──────────────────────────────────────────────
+// ── Remove ───────────────────────────────────────────────────────────
 function removeStop(id) {
   var el = document.getElementById('stop-' + id);
-  if (el) { el.remove(); }
+  if (el) el.remove();
   renumberStops();
   updateCounter();
+  if (!document.querySelectorAll('#stops-container .stop-row').length)
+    document.getElementById('col-headers').style.display = 'none';
 }
 
-// ── Renumber badge labels after add/remove ─────────────────────────
 function renumberStops() {
   var rows = document.querySelectorAll('#stops-container .stop-row');
   for (var i = 0; i < rows.length; i++) {
-    var badge = rows[i].querySelector('.stop-badge');
-    if (badge) { badge.textContent = 'STOP ' + (i + 1); }
+    var b = rows[i].querySelector('.stop-badge');
+    if (b) b.textContent = 'STOP ' + (i + 1);
   }
 }
 
-// ── Update the header counter ──────────────────────────────────────
 function updateCounter() {
-  var count = document.querySelectorAll('#stops-container .stop-row').length;
-  document.getElementById('stop-counter').textContent = count + ' stop' + (count !== 1 ? 's' : '');
+  var c = document.querySelectorAll('#stops-container .stop-row').length;
+  document.getElementById('stop-counter').textContent = c + ' stop' + (c !== 1 ? 's' : '');
 }
 
-// ── Station validation on dropdown change ──────────────────────────
+// ── Core: recalculate departure for stop idx, then cascade forward ───
+function onWaitChange(idx) {
+  var arr  = document.getElementById('arr-' + idx);
+  var dep  = document.getElementById('dep-' + idx);
+  var wH   = parseInt(document.getElementById('wait-h-' + idx).value) || 0;
+  var wM   = parseInt(document.getElementById('wait-m-' + idx).value) || 0;
+
+  if (!arr || !arr.value) return;
+
+  var p   = arr.value.split(':');
+  var tot = parseInt(p[0])*60 + parseInt(p[1]) + wH*60 + wM;
+  dep.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
+
+  cascadeFrom(idx);  // update all subsequent stops
+}
+
+// ── Manual arrival change (first stop only) ──────────────────────────
+function onArrivalChange(idx) {
+  onWaitChange(idx);
+}
+
+// ── Cascade: walk every stop after fromIdx and update arrival ─────────
+function cascadeFrom(fromIdx) {
+  var rows    = document.querySelectorAll('#stops-container .stop-row');
+  var myRow   = document.getElementById('stop-' + fromIdx);
+  if (!myRow) return;
+  var start   = Array.prototype.indexOf.call(rows, myRow);
+
+  for (var i = start + 1; i < rows.length; i++) {
+    var prev    = rows[i - 1];
+    var curr    = rows[i];
+    var pIdx    = parseInt(prev.dataset.idx);
+    var cIdx    = parseInt(curr.dataset.idx);
+    var prevDep = document.getElementById('dep-' + pIdx);
+    var currArr = document.getElementById('arr-' + cIdx);
+    if (!prevDep || !prevDep.value || !currArr) break;
+
+    var pSel = prev.querySelector('select[name="stop_station_id"]');
+    var cSel = curr.querySelector('select[name="stop_station_id"]');
+    var pSid = parseInt(pSel ? pSel.value : 0);
+    var cSid = parseInt(cSel ? cSel.value : 0);
+    if (!pSid || !cSid) break;
+
+    var key = pSid + '_' + cSid;
+    if (_travelCache[key] !== undefined) {
+      // Instant: use cached travel minutes
+      var p2  = prevDep.value.split(':');
+      var tot = parseInt(p2[0])*60 + parseInt(p2[1]) + _travelCache[key];
+      currArr.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
+      onWaitChange(cIdx);   // recalculate this stop's departure & continue cascade
+    } else {
+      // Need to fetch — the API callback will call onWaitChange → cascadeFrom → continues
+      fetchTravelTime(pSid, cSid, prevDep.value, cIdx);
+      break;
+    }
+  }
+}
+
+// ── Fetch travel time from API (once per station pair) ───────────────
+function fetchTravelTime(fromId, toId, depTime, targetIdx) {
+  var arrInput = document.getElementById('arr-' + targetIdx);
+  var row      = document.getElementById('stop-' + targetIdx);
+  var msg      = document.getElementById('vmsg-' + targetIdx);
+
+  if (row) row.classList.add('calculating');
+  if (msg) { msg.textContent = '⏳ Calculating distance…'; msg.className = 'validation-msg calc'; }
+
+  fetch('/admin/api/calculate-journey?from_id=' + fromId + '&to_id=' + toId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (row) row.classList.remove('calculating');
+      if (data.estimated_minutes && !data.error) {
+        _travelCache[fromId + '_' + toId] = data.estimated_minutes;
+
+        var p   = depTime.split(':');
+        var tot = parseInt(p[0])*60 + parseInt(p[1]) + data.estimated_minutes;
+        arrInput.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
+
+        if (msg) {
+          var st = stationMap[toId];
+          msg.textContent = '✓ ' + (st ? st.station_name : '') +
+            ' · ' + data.distance_km + ' km · ~' + data.estimated_minutes + ' min travel';
+          msg.className = 'validation-msg ok';
+        }
+        onWaitChange(targetIdx);   // recalculate departure → triggers cascade
+      } else {
+        if (msg) msg.className = 'validation-msg warn';
+      }
+    })
+    .catch(function() {
+      if (row) row.classList.remove('calculating');
+    });
+}
+
+// ── Station dropdown change ──────────────────────────────────────────
 function onStopChange(select, idx) {
   var stationId = parseInt(select.value, 10);
   var row = document.getElementById('stop-' + idx);
   var msg = document.getElementById('vmsg-' + idx);
 
   if (!stationId) {
-    msg.textContent = '';
-    msg.className = 'validation-msg';
-    row.classList.remove('validated', 'unresolved');
+    msg.textContent = ''; msg.className = 'validation-msg';
+    row.classList.remove('validated', 'unresolved', 'calculating');
     return;
   }
 
   var found = stationMap[stationId];
-  if (found) {
-    msg.textContent = '\u2713 ' + found.station_name + ', ' + found.city + ' \u00b7 ' + found.state;
-    msg.className = 'validation-msg ok';
-    row.classList.add('validated');
-    row.classList.remove('unresolved');
-    calculateTimeForStop(select, stationId);
-  } else {
-    msg.textContent = '\u2717 Station not in registry \u2014 cannot proceed';
+  if (!found) {
+    msg.textContent = '✗ Station not in registry';
     msg.className = 'validation-msg warn';
-    row.classList.remove('validated');
-    row.classList.add('unresolved');
+    row.classList.add('unresolved'); row.classList.remove('validated');
+    return;
   }
-}
 
-function calculateTimeForStop(selectElement, currentStationId) {
-  var currentRow = selectElement.closest('.stop-row');
-  var prevRow = currentRow.previousElementSibling;
-  
-  if (!prevRow || !prevRow.classList.contains('stop-row')) return;
-  
+  msg.textContent = '✓ ' + found.station_name + ', ' + found.city;
+  msg.className = 'validation-msg ok';
+  row.classList.add('validated'); row.classList.remove('unresolved');
+
+  var rows    = document.querySelectorAll('#stops-container .stop-row');
+  var myIndex = Array.prototype.indexOf.call(rows, row);
+
+  if (myIndex === 0) {
+    var arrInput = document.getElementById('arr-' + idx);
+    if (arrInput) arrInput.removeAttribute('readonly');
+    document.getElementById('arr-label-' + idx).textContent = 'Set manually';
+    return;
+  }
+
+  var prevRow    = rows[myIndex - 1];
+  var prevIdx    = parseInt(prevRow.dataset.idx);
   var prevSelect = prevRow.querySelector('select[name="stop_station_id"]');
-  var prevDepartInput = prevRow.querySelector('input[name="departure_time"]');
-  if (!prevSelect || !prevDepartInput) return;
-  
-  var prevStationId = parseInt(prevSelect.value);
-  var prevDepartTime = prevDepartInput.value;
-  if (!prevStationId || !prevDepartTime) return;
-  
-  var currentArrivalInput = currentRow.querySelector('input[name="arrival_time"]');
-  var currentDepartInput = currentRow.querySelector('input[name="departure_time"]');
-  if (!currentArrivalInput || !currentDepartInput) return;
-  
-  // Do not overwrite existing manual edits
-  if (currentArrivalInput.value && currentDepartInput.value) return;
+  var prevDep    = document.getElementById('dep-' + prevIdx);
 
-  var msg = currentRow.querySelector('.validation-msg');
-  var baseMsg = msg ? msg.textContent : '';
-  if (msg) {
-      msg.textContent = '\u231B Calculating distance & time...';
-      msg.classList.remove('ok');
-      msg.style.color = 'var(--amber)';
+  if (!prevSelect || !prevSelect.value || !prevDep || !prevDep.value) {
+    msg.textContent += ' · set previous stop departure first';
+    return;
   }
 
-  fetch('/admin/api/calculate-journey?from_id=' + prevStationId + '&to_id=' + currentStationId)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.estimated_minutes && !data.error) {
-        var parts = prevDepartTime.split(':');
-        var date = new Date(2000, 0, 1, parseInt(parts[0]), parseInt(parts[1]));
-        
-        // calculate arrival
-        date.setMinutes(date.getMinutes() + data.estimated_minutes);
-        var arrHH = String(date.getHours()).padStart(2, '0');
-        var arrMM = String(date.getMinutes()).padStart(2, '0');
-        if (!currentArrivalInput.value) { currentArrivalInput.value = arrHH + ':' + arrMM; }
-        
-        // calculate departure (arrival + 10 mins approx)
-        date.setMinutes(date.getMinutes() + 10);
-        var depHH = String(date.getHours()).padStart(2, '0');
-        var depMM = String(date.getMinutes()).padStart(2, '0');
-        if (!currentDepartInput.value) { currentDepartInput.value = depHH + ':' + depMM; }
-        
-        if (msg) {
-            var prefixFree = baseMsg.replace(/^[\u2713\u2717]\s*/, '');
-            msg.textContent = '\u2713 ' + prefixFree + ' (' + data.distance_km + ' km track)';
-            msg.classList.add('ok');
-            msg.style.color = '';
-        }
-      } else {
-        if (msg) { msg.textContent = baseMsg; msg.classList.add('ok'); msg.style.color = ''; }
-      }
-    })
-    .catch(function() { 
-        if (msg) { msg.textContent = baseMsg; msg.classList.add('ok'); msg.style.color = ''; }
-    });
+  // Clear arrival so it gets freshly calculated
+  document.getElementById('arr-' + idx).value = '';
+  fetchTravelTime(parseInt(prevSelect.value), stationId, prevDep.value, idx);
 }
 
-// ── Form submit guard ──────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────
+function pad(n) { return String(n).padStart(2, '0'); }
+
+// ── Form validation ──────────────────────────────────────────────────
 function validateAllStops() {
   var rows = document.querySelectorAll('#stops-container .stop-row');
-  if (rows.length === 0) {
-    alert('Please add at least one stop before saving.');
-    return false;
-  }
+  if (!rows.length) { alert('Add at least one stop before saving.'); return false; }
   for (var i = 0; i < rows.length; i++) {
     var sel = rows[i].querySelector('select[name="stop_station_id"]');
-    if (!sel || !sel.value) {
-      alert('Stop ' + (i + 1) + ': Please select a station.');
-      return false;
-    }
-    if (!stationMap[parseInt(sel.value, 10)]) {
-      alert('Stop ' + (i + 1) + ': Station not found in registry.');
-      return false;
-    }
+    if (!sel || !sel.value) { alert('Stop ' + (i+1) + ': Please select a station.'); return false; }
+    if (!stationMap[parseInt(sel.value)]) { alert('Stop ' + (i+1) + ': Station not in registry.'); return false; }
   }
   return true;
 }
 
-// ── On page load: render existing stops or default 2 empty ones ────
+// ── Turnaround AJAX save ──────────────────────────────────────────────
+function saveTurnaround() {
+  var h     = parseInt(document.getElementById('ta-hours').value)  || 0;
+  var m     = parseInt(document.getElementById('ta-mins').value)   || 0;
+  var scale = parseFloat(document.getElementById('ta-scale').value) || 8.0;
+  var totalMins = h * 60 + m;
+
+  var btn = document.getElementById('ta-save-btn');
+  var msg = document.getElementById('ta-save-msg');
+  btn.disabled = true;
+  msg.style.display = 'none';
+
+  fetch('/admin/super/trains/{{ train.train_id }}/set-turnaround', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '' },
+    body: JSON.stringify({ turnaround_minutes: totalMins, anim_speed_scale: scale })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    if (data.ok) {
+      msg.textContent = '✓ Saved! (' + totalMins + ' min turnaround, ' + scale + 's/hr scale)';
+      msg.style.color = 'var(--green)';
+    } else {
+      msg.textContent = '✗ Save failed';
+      msg.style.color = 'var(--danger)';
+    }
+    msg.style.display = 'inline';
+    setTimeout(function() { msg.style.display = 'none'; }, 3000);
+  })
+  .catch(function() {
+    btn.disabled = false;
+    msg.textContent = '✗ Network error';
+    msg.style.color = 'var(--danger)';
+    msg.style.display = 'inline';
+  });
+}
+
+// ── Validate then submit stops form ──────────────────────────────────
+function validateAndSave() {
+  return validateAllStops();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
 (function init() {
   if (existingStops.length > 0) {
-    for (var i = 0; i < existingStops.length; i++) {
-      var s = existingStops[i];
-      addStop(s.station_id, s.arrival, s.departure);
-    }
+    existingStops.forEach(function(s) { addStop(s.station_id, s.arrival, s.departure); });
   } else {
-    addStop();
-    addStop();
+    addStop(); addStop();
   }
 })();
 </script>

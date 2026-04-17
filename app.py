@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from flask_socketio import SocketIO
+from flask_compress import Compress
 from dotenv import load_dotenv
 load_dotenv()
 import os
@@ -17,6 +18,9 @@ def create_app():
         'mysql+pymysql://root:nnm24cc046@localhost/Train_DB'
     )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Gzip compression for all JSON + HTML responses (cuts payload 70-80%)
+    Compress(app)
 
     db.init_app(app)
     bcrypt.init_app(app)
@@ -50,4 +54,4 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)

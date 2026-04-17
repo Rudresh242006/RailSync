@@ -220,6 +220,99 @@ def verify_otp():
     return render_template('verify_otp.html', masked_email=masked_email)
 
 
+@auth_bp.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Step 1 — user enters email, OTP is sent."""
+    if current_user.is_authenticated:
+        return redirect(url_for('auth.index'))
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'send')
+
+        # ── Step 1: send OTP ──────────────────────────────────────
+        if action == 'send':
+            email = request.form.get('email', '').strip().lower()
+            user = User.query.filter_by(email=email).first()
+            if not user:
+                flash('No account found with that email address.', 'danger')
+                return render_template('forgot_password.html', step='email')
+
+            from services.email_service import generate_otp, send_otp_email
+            import time
+            otp = generate_otp()
+            session['forgot_pw'] = {
+                'email':       email,
+                'otp':         otp,
+                'otp_expires': time.time() + 600,
+                'attempts':    0,
+                'verified':    False,
+            }
+            send_otp_email(email, user.name, otp)
+            flash(f'A verification code was sent to {email}.', 'info')
+            return render_template('forgot_password.html', step='otp',
+                                   masked_email=email[:3] + '•••@' + email.split('@')[1])
+
+        # ── Step 2: verify OTP ────────────────────────────────────
+        if action == 'verify':
+            import time
+            pending = session.get('forgot_pw')
+            if not pending:
+                flash('Session expired. Please start again.', 'warning')
+                return redirect(url_for('auth.forgot_password'))
+
+            entered = request.form.get('otp', '').strip()
+
+            if time.time() > pending['otp_expires']:
+                session.pop('forgot_pw', None)
+                flash('OTP expired. Please try again.', 'danger')
+                return redirect(url_for('auth.forgot_password'))
+
+            if pending.get('attempts', 0) >= 5:
+                session.pop('forgot_pw', None)
+                flash('Too many incorrect attempts. Please start again.', 'danger')
+                return redirect(url_for('auth.forgot_password'))
+
+            if entered != pending['otp']:
+                pending['attempts'] = pending.get('attempts', 0) + 1
+                session['forgot_pw'] = pending
+                remaining = 5 - pending['attempts']
+                flash(f'Incorrect code. {remaining} attempt(s) remaining.', 'danger')
+                masked = pending['email'][:3] + '•••@' + pending['email'].split('@')[1]
+                return render_template('forgot_password.html', step='otp', masked_email=masked)
+
+            pending['verified'] = True
+            session['forgot_pw'] = pending
+            return render_template('forgot_password.html', step='reset')
+
+        # ── Step 3: set new password ──────────────────────────────
+        if action == 'reset':
+            pending = session.get('forgot_pw')
+            if not pending or not pending.get('verified'):
+                flash('Session expired. Please start again.', 'warning')
+                return redirect(url_for('auth.forgot_password'))
+
+            new_pw  = request.form.get('password', '')
+            confirm = request.form.get('confirm_password', '')
+
+            if len(new_pw) < 8:
+                flash('Password must be at least 8 characters.', 'danger')
+                return render_template('forgot_password.html', step='reset')
+            if new_pw != confirm:
+                flash('Passwords do not match.', 'danger')
+                return render_template('forgot_password.html', step='reset')
+
+            user = User.query.filter_by(email=pending['email']).first()
+            if user:
+                user.password_hash = bcrypt.generate_password_hash(new_pw).decode('utf-8')
+                db.session.commit()
+
+            session.pop('forgot_pw', None)
+            flash('Password reset successfully. Please sign in.', 'success')
+            return redirect(url_for('auth.login'))
+
+    return render_template('forgot_password.html', step='email')
+
+
 @auth_bp.route('/logout')
 @login_required
 def logout():

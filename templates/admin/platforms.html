@@ -6,25 +6,39 @@
 <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
 
   <div>
+    <!-- PLATFORM GRID -->
     <div class="card" style="margin-bottom:16px">
       <div class="card-header">
         <div class="card-title">Platforms at {{ current_user.station.station_name }}</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
         {% for p in platforms %}
-        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:800;color:var(--accent2)">{{ p.platform_number }}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">Platform</div>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;position:relative">
+          <div style="font-size:32px;font-weight:800;color:var(--accent2)">{{ p.platform_number }}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Platform</div>
           {% if p.is_available %}
-          <span class="badge badge-green" style="margin-top:8px">Available</span>
+          <span class="badge badge-green" style="margin-top:8px;display:inline-block">Available</span>
           {% else %}
-          <span class="badge badge-red" style="margin-top:8px">Occupied</span>
+          <span class="badge badge-red" style="margin-top:8px;display:inline-block">Occupied</span>
           {% endif %}
+          <!-- Delete button -->
+          <form method="POST" action="{{ url_for('admin.delete_platform', platform_id=p.platform_id) }}"
+                onsubmit="return confirm('Delete Platform {{ p.platform_number }}? All allocations will also be removed.')"
+                style="margin-top:10px">
+            <button type="submit"
+              style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
+                     border-radius:7px;padding:4px 14px;font-size:12px;cursor:pointer;width:100%;
+                     transition:background 0.2s"
+              onmouseover="this.style.background='rgba(239,68,68,0.25)'"
+              onmouseout="this.style.background='rgba(239,68,68,0.12)'">
+              Delete
+            </button>
+          </form>
         </div>
         {% endfor %}
         {% if not platforms %}
         <div style="color:var(--muted);font-size:13px;grid-column:1/-1;text-align:center;padding:20px">
-          No platforms yet. Add one using the form.
+          No platforms yet. Add one using the form →
         </div>
         {% endif %}
       </div>
@@ -58,6 +72,7 @@
 
   <!-- SIDEBAR FORMS -->
   <div>
+    <!-- Add Platform -->
     <div class="card" style="margin-bottom:14px">
       <div class="card-title" style="margin-bottom:14px">Add Platform</div>
       <form method="POST" action="{{ url_for('admin.add_platform') }}">
@@ -69,8 +84,12 @@
       </form>
     </div>
 
+    <!-- Allocate Platform -->
     <div class="card">
-      <div class="card-title" style="margin-bottom:14px">Allocate Platform</div>
+      <div class="card-title" style="margin-bottom:4px">Allocate Platform</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">
+        Arrival &amp; departure times are auto-filled from the Super Admin schedule.
+      </div>
       <form method="POST" action="{{ url_for('admin.allocate_platform') }}">
         <div class="form-group">
           <label>Train</label>
@@ -89,14 +108,6 @@
             <option value="{{ p.platform_id }}">Platform {{ p.platform_number }}</option>
             {% endfor %}
           </select>
-        </div>
-        <div class="form-group">
-          <label>Arrival Time</label>
-          <input type="datetime-local" name="arrival_time" required>
-        </div>
-        <div class="form-group">
-          <label>Departure Time</label>
-          <input type="datetime-local" name="departure_time" required>
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%">Allocate →</button>
       </form>

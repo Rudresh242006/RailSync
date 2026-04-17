@@ -68,17 +68,31 @@
       background-size: 50px 50px; z-index: 0; pointer-events: none;
     }
 
-    /* ===== GLASS CARD ===== */
     .card {
       width: 100%; max-width: 420px;
       background: var(--card);
       backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-      border: 1px solid var(--border);
+      border: 2px solid rgba(34,197,94,0.80);
       border-radius: 24px; padding: 44px 40px;
       position: relative; z-index: 10;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(34,197,94,0.05);
-      animation: portalIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      box-shadow:
+        0 30px 60px rgba(0,0,0,0.6),
+        0 0 0 4px rgba(34,197,94,0.12),
+        0 0 60px rgba(34,197,94,0.22),
+        0 0 120px rgba(34,197,94,0.10),
+        inset 0 1px 0 rgba(255,255,255,0.12);
+      animation: portalIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards, borderPulse 3s ease-in-out infinite alternate;
       opacity: 0; transform: translateY(50px) scale(0.92);
+    }
+    @keyframes borderPulse {
+      from {
+        box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 0 4px rgba(34,197,94,0.10), 0 0 40px rgba(34,197,94,0.16), 0 0 80px rgba(34,197,94,0.07), inset 0 1px 0 rgba(255,255,255,0.12);
+        border-color: rgba(34,197,94,0.60);
+      }
+      to {
+        box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 0 6px rgba(34,197,94,0.18), 0 0 80px rgba(34,197,94,0.32), 0 0 140px rgba(34,197,94,0.12), inset 0 1px 0 rgba(255,255,255,0.12);
+        border-color: rgba(34,197,94,1);
+      }
     }
     .card::before {
       content: ''; position: absolute; top: 0; left: 20px; right: 20px; height: 1px;
@@ -135,28 +149,29 @@
     .form-group { margin-bottom: 22px; position: relative; }
     label { 
       display: flex; align-items: center; gap: 6px;
-      font-size: 11px; font-weight: 600; color: var(--muted); 
+      font-size: 11px; font-weight: 600; color: #c8cadb; 
       margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; 
     }
     label i { font-size: 12px; color: var(--accent); }
     input {
       width: 100%; padding: 13px 16px;
-      background: var(--inputBg); 
-      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(34,197,94,0.55);
       border-radius: 12px; color: #fff;
       font-family: inherit; font-size: 14px; outline: none;
       transition: all 0.3s;
+      box-shadow: 0 0 0 1px rgba(34,197,94,0.12) inset;
     }
     input:focus { 
-      border-color: var(--accent); 
-      box-shadow: 0 0 0 3px rgba(34,197,94,0.12), 0 0 20px rgba(34,197,94,0.08); 
-      background: rgba(34,197,94,0.04); 
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(34,197,94,0.20), 0 0 28px rgba(34,197,94,0.14);
+      background: rgba(34,197,94,0.12);
     }
     input:hover {
-      border-color: rgba(34,197,94,0.6);
-      background: rgba(34,197,94,0.02);
+      border-color: rgba(34,197,94,0.80);
+      background: rgba(255,255,255,0.10);
     }
-    input::placeholder { color: rgba(255,255,255,0.2); }
+    input::placeholder { color: rgba(200,202,219,0.65); }
     input:-webkit-autofill,
     input:-webkit-autofill:hover, 
     input:-webkit-autofill:focus, 
@@ -218,6 +233,24 @@
     .alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: var(--accent); }
     .alert-info { background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.25); color: var(--purple2); }
 
+    .home-btn {
+      position: fixed; top: 24px; left: 24px;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(255,255,255,0.04); color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none; font-size: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      animation: alertIn 0.8s ease backwards; animation-delay: 0.2s;
+    }
+    .home-btn:hover {
+      background: rgba(255,255,255,0.1); color: #fff;
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,0.2);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(108,99,255,0.2);
+    }
+
     /* Stagger form fields */
     .stagger-1 { animation: fieldIn 0.6s ease backwards; animation-delay: 0.3s; }
     .stagger-2 { animation: fieldIn 0.6s ease backwards; animation-delay: 0.4s; }
@@ -228,6 +261,7 @@
 <body>
 
 <div class="bg-mesh"></div>
+<a href="/" class="home-btn" title="Back to Home"><i class="fa-solid fa-house"></i></a>
 
 <!-- Floating particles -->
 <div class="particle" style="width:3px;height:3px;left:12%;animation-duration:8s;animation-delay:0s;"></div>

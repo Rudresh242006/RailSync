@@ -1,0 +1,1515 @@
+{% extends "base.html" %}
+{% block title %}Live Status — India Rail Network{% endblock %}
+{% block page_title %}🛰 Live Rail Network Status{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<!-- No external tile layer needed - using pure GeoJSON India map -->
+
+<style>
+/* ─── LAYOUT ─────────────────────────────────────────────────── */
+.ls-wrapper {
+  display: flex;
+  gap: 0;
+  height: calc(100vh - 60px - 56px); /* full height minus topbar+page-content padding */
+  margin: -28px -24px; /* bleed to edges of .page-content */
+  overflow: hidden;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+/* ─── MAP PANEL ───────────────────────────────────────────────── */
+#ls-map {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  background: #0d0e17;
+}
+
+/* Override Leaflet tile layer to dark tint - not used, pure GeoJSON map */
+.leaflet-container { background: #080b14 !important; }
+
+/* State label tooltip */
+.india-state-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: rgba(200,215,255,0.55);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: 'Space Grotesk', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.8);
+}
+.india-state-label::before { display: none !important; }
+
+/* Station name label on map */
+.station-name-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: rgba(220,230,255,0.80);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: 'Space Grotesk', sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.8);
+  padding: 0 !important;
+}
+.station-name-label::before { display: none !important; }
+
+/* Sea / outside India dimming */
+.leaflet-container .leaflet-pane svg path.india-state {
+  transition: fill 0.2s;
+}
+
+/* India map legend key rows */
+.ls-map-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.ls-map-key-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #ffd93d;
+  box-shadow: 0 0 6px rgba(255,217,61,0.53);
+  flex-shrink: 0;
+}
+.ls-map-key-label { font-size: 10px; color: var(--muted); }
+
+/* ─── RIGHT PANEL ─────────────────────────────────────────────── */
+.ls-panel {
+  width: 340px;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0d101a;
+  border-left: 1px solid rgba(108,99,255,0.2);
+  overflow: hidden;
+}
+
+.ls-panel-header {
+  padding: 18px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.ls-panel-title {
+  font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--accent2);
+  display: flex; align-items: center; gap: 8px;
+}
+.ls-live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  animation: pulse-green 1.4s ease-in-out infinite;
+}
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #22c55e; }
+  50% { opacity: 0.6; transform: scale(1.4); box-shadow: 0 0 16px #22c55e; }
+}
+
+.ls-time {
+  font-size: 11px; color: var(--muted);
+  margin-top: 4px; font-family: 'JetBrains Mono', monospace;
+}
+
+/* Filter chips */
+.ls-filter-row {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.ls-chip {
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.ls-chip:hover { border-color: rgba(108,99,255,0.5); color: var(--text); }
+.ls-chip.active {
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 0 1.5px rgba(108,99,255,0.6), 0 0 12px rgba(108,99,255,0.3);
+}
+
+/* Train card list */
+.ls-train-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px 16px;
+}
+.ls-train-list::-webkit-scrollbar { width: 4px; }
+.ls-train-list::-webkit-scrollbar-track { background: transparent; }
+.ls-train-list::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.3); border-radius: 4px; }
+
+.ls-train-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.25s;
+  overflow: hidden;
+  animation: cardIn 0.4s ease both;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ls-train-card:hover {
+  border-color: rgba(108,99,255,0.4);
+  background: rgba(108,99,255,0.06);
+  transform: translateX(3px);
+}
+.ls-train-card.selected {
+  border-color: var(--accent);
+  background: rgba(108,99,255,0.1);
+  box-shadow: 0 0 20px rgba(108,99,255,0.15);
+}
+
+.ls-train-card-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px 8px;
+}
+.ls-color-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.ls-train-name {
+  font-size: 13px; font-weight: 600; line-height: 1.2;
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ls-train-num {
+  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  color: var(--accent2);
+  flex-shrink: 0;
+}
+
+.ls-train-status {
+  padding: 0 14px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ls-status-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--muted);
+}
+.ls-status-val { color: var(--text); font-weight: 500; }
+
+/* Delay badge */
+.ls-delay-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+  background: rgba(239,68,68,0.15); color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.3);
+}
+.ls-ok-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+  background: rgba(34,197,94,0.15); color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.3);
+}
+
+/* Expanded stops timeline (shown when selected) */
+.ls-stops-timeline {
+  display: none; padding: 0 14px 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 4px;
+}
+.ls-train-card.selected .ls-stops-timeline { display: block; }
+
+.ls-route-summary {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin: 10px 0;
+}
+.ls-route-stat {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.ls-route-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.ls-route-stat-val { font-size: 15px; font-weight: 700; margin-top: 2px; }
+
+/* Stop list */
+.ls-stop-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 6px 0; position: relative;
+  font-size: 12px;
+}
+.ls-stop-spine {
+  display: flex; flex-direction: column; align-items: center;
+  flex-shrink: 0; width: 16px;
+}
+.ls-stop-dot {
+  width: 10px; height: 10px; border-radius: 50%; border: 2.5px solid currentColor;
+  flex-shrink: 0; z-index: 1; background: #0d101a;
+  transition: all 0.3s;
+}
+.ls-stop-dot.current {
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.15);
+  animation: pulseDot 1.2s ease-in-out infinite;
+}
+@keyframes pulseDot {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255,255,255,0.15); }
+  50% { box-shadow: 0 0 0 8px rgba(255,255,255,0.05); }
+}
+.ls-stop-line {
+  width: 2px; flex: 1; min-height: 18px;
+  background: linear-gradient(to bottom, currentColor, transparent);
+  opacity: 0.3;
+}
+.ls-stop-info { flex: 1; min-width: 0; padding-bottom: 4px; }
+.ls-stop-name { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ls-stop-meta { color: var(--muted); font-size: 11px; margin-top: 1px; }
+.ls-stop-times { text-align: right; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+
+
+/* ─── MAP OVERLAY LOADING ─────────────────────────────────────── */
+#ls-loading {
+  position: absolute; inset: 0;
+  background: rgba(10,11,15,0.85);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 9999;
+  gap: 16px;
+  backdrop-filter: blur(4px);
+  transition: opacity 0.5s;
+}
+#ls-loading.hidden { opacity: 0; pointer-events: none; }
+
+.ls-radar {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  border: 2px solid rgba(108,99,255,0.2);
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.ls-radar::before {
+  content: '';
+  position: absolute; inset: 8px;
+  border-radius: 50%;
+  border: 2px solid rgba(108,99,255,0.35);
+}
+.ls-radar::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 70%, rgba(108,99,255,0.7));
+  animation: radarSpin 1.4s linear infinite;
+}
+@keyframes radarSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.ls-loading-text {
+  font-size: 14px; font-weight: 600; color: var(--accent2);
+  letter-spacing: 0.5px;
+  animation: fadeText 1.4s ease-in-out infinite;
+}
+@keyframes fadeText {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+}
+
+/* ─── CUSTOM LEAFLET STYLES ────────────────────────────────────── */
+
+/* Floating legend */
+#ls-legend {
+  position: absolute;
+  bottom: 20px; left: 12px;
+  z-index: 900;
+  background: rgba(13,16,26,0.92);
+  border: 1px solid rgba(108,99,255,0.25);
+  border-radius: 12px;
+  padding: 10px 14px;
+  backdrop-filter: blur(8px);
+  max-width: 200px;
+  max-height: 40vh;
+  overflow-y: auto;
+  font-size: 12px;
+}
+#ls-legend::-webkit-scrollbar { width: 3px; }
+#ls-legend::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.4); border-radius: 3px; }
+.ls-legend-title { font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+.ls-legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; cursor: pointer; padding: 2px 4px; border-radius: 6px; transition: background 0.2s; }
+.ls-legend-item:hover { background: rgba(255,255,255,0.06); }
+.ls-legend-line { width: 22px; height: 3px; border-radius: 3px; flex-shrink: 0; }
+.ls-legend-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-size: 11px; }
+
+/* Floating stats bar on map */
+#ls-stats-bar {
+  position: absolute;
+  top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 900;
+  display: flex; gap: 12px;
+  background: rgba(13,16,26,0.88);
+  border: 1px solid rgba(108,99,255,0.2);
+  border-radius: 12px;
+  padding: 8px 16px;
+  backdrop-filter: blur(12px);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+.ls-stat-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ls-stat-item-val { font-size: 16px; font-weight: 700; }
+.ls-stat-item-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+
+/* Custom train icon */
+.train-icon-wrap {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.leaflet-marker-icon { background: transparent; border: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Full-bleed Live Status wrapper -->
+<div class="ls-wrapper" id="ls-wrapper">
+
+  <!-- MAP -->
+  <div style="position:relative;flex:1;min-width:0;">
+    <div id="ls-map"></div>
+
+    <!-- Loading overlay -->
+    <div id="ls-loading">
+      <div class="ls-radar">
+        <i class="fa-solid fa-satellite-dish" style="font-size:22px;color:var(--accent);z-index:1;position:relative"></i>
+      </div>
+      <div class="ls-loading-text">Acquiring train positions…</div>
+    </div>
+
+    <!-- Floating stats bar -->
+    <div id="ls-stats-bar">
+      <div class="ls-stat-item">
+        <div class="ls-stat-item-val text-primary" id="stat-trains">—</div>
+        <div class="ls-stat-item-lbl">Trains</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,0.1)"></div>
+      <div class="ls-stat-item">
+        <div class="ls-stat-item-val" style="color:var(--blue)" id="stat-stations">—</div>
+        <div class="ls-stat-item-lbl">Stations</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,0.1)"></div>
+      <div class="ls-stat-item">
+        <div class="ls-stat-item-val" style="color:var(--amber)" id="stat-delayed">—</div>
+        <div class="ls-stat-item-lbl">Delayed</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,0.1)"></div>
+      <div class="ls-stat-item">
+        <div class="ls-stat-item-val" style="color:var(--green)" id="stat-km">—</div>
+        <div class="ls-stat-item-lbl">Total km Tracked</div>
+      </div>
+    </div>
+
+    <!-- Color legend -->
+    <div id="ls-legend">
+      <div class="ls-legend-title">Train Routes</div>
+      <div id="ls-legend-body"><span style="color:var(--muted);font-size:11px">Loading…</span></div>
+      <!-- Map key -->
+      <!-- Map legend key: 3-tier colour system -->
+      <div class="ls-map-key">
+        <div style="width:9px;height:9px;border-radius:50%;background:#ffd93d;box-shadow:0 0 5px rgba(255,217,61,0.6);flex-shrink:0"></div>
+        <div class="ls-map-key-label">State Capital (no station)</div>
+      </div>
+      <div class="ls-map-key" style="margin-top:4px;padding-top:0;border-top:none">
+        <div style="width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0"></div>
+        <div class="ls-map-key-label">Station at State Capital</div>
+      </div>
+      <div class="ls-map-key" style="margin-top:4px;padding-top:0;border-top:none">
+        <div style="width:9px;height:9px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+        <div class="ls-map-key-label">Railway Station</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="ls-panel">
+    <div class="ls-panel-header">
+      <div class="ls-panel-title">
+        <div class="ls-live-dot"></div>
+        Live Network Feed
+      </div>
+      <div class="ls-time" id="ls-clock">—</div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="ls-filter-row" id="ls-filter-row">
+      <button class="ls-chip active" data-id="all" onclick="filterTrain('all', this)" style="background:rgba(108,99,255,0.2);border-color:var(--accent)">
+        🗺 All Trains
+      </button>
+    </div>
+
+    <!-- Train cards -->
+    <div class="ls-train-list" id="ls-train-list">
+      <div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:13px">
+        <i class="fa-solid fa-satellite-dish" style="font-size:28px;margin-bottom:12px;display:block;color:rgba(108,99,255,0.4)"></i>
+        Loading train data…
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Schedule Train Modal ─────────────────────────────────────── -->
+<div id="sched-modal" style="
+  display:none; position:fixed; inset:0; z-index:9000;
+  background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center;
+  opacity:0; transition:opacity .25s;
+" onclick="if(event.target===this)closeScheduleModal()">
+  <div style="
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:16px; padding:28px 28px 22px; width:360px; max-width:95vw;
+    box-shadow:0 24px 64px rgba(0,0,0,0.5);
+    transform:translateY(20px); transition:transform .25s;
+  " id="sched-modal-inner">
+    <div style="font-size:17px;font-weight:800;margin-bottom:4px">&#x23F1; Schedule Journey</div>
+    <div id="sched-train-label" style="font-size:12px;color:var(--muted);margin-bottom:20px">—</div>
+
+    <!-- Route display -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;
+                background:var(--bg3);border-radius:10px;padding:10px 14px">
+      <div style="font-size:11px;text-align:center">
+        <div style="font-weight:700;color:var(--green)" id="sched-source-label">Source</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">Source</div>
+      </div>
+      <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:2px"></div>
+      <div style="font-size:11px;text-align:center">
+        <div style="font-weight:700;color:var(--accent)" id="sched-dest-label">Dest</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">Destination</div>
+      </div>
+    </div>
+
+    <!-- Direction toggle -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">
+        Direction
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="sched-dir-btn" data-dir="forward"
+          onclick="document.querySelectorAll('.sched-dir-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
+          style="flex:1;padding:8px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
+                 border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:.15s">
+          &#x25B6; Forward<br>
+          <span style="font-size:9px;font-weight:400;opacity:.7">Source &#x2192; Dest</span>
+        </button>
+        <button class="sched-dir-btn" data-dir="reverse"
+          onclick="document.querySelectorAll('.sched-dir-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
+          style="flex:1;padding:8px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
+                 border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:.15s">
+          &#x25C0; Return<br>
+          <span style="font-size:9px;font-weight:400;opacity:.7">Dest &#x2192; Source</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Datetime picker -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">
+        Departure Date &amp; Time
+      </div>
+      <input type="datetime-local" id="sched-datetime"
+        style="width:100%;box-sizing:border-box;color-scheme:dark">
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">
+        Set when the train departs from its origin in the chosen direction.
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;align-items:center;gap:10px">
+      <button id="sched-save-btn" onclick="saveSchedule()"
+        class="btn btn-primary" style="flex:1">
+        &#x1F4BE; Save Schedule
+      </button>
+      <button onclick="closeScheduleModal()" class="btn btn-ghost">Cancel</button>
+    </div>
+    <div id="sched-save-msg" style="font-size:12px;margin-top:8px;min-height:16px;text-align:center"></div>
+  </div>
+</div>
+
+<style>
+/* Schedule modal visible state */
+#sched-modal.visible            { opacity:1; }
+#sched-modal.visible #sched-modal-inner { transform:translateY(0); }
+
+/* Direction button active */
+.sched-dir-btn.active {
+  background: rgba(108,99,255,0.15) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* datetime-local dark style */
+input[type="datetime-local"] {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+}
+input[type="datetime-local"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(108,99,255,0.2);
+}
+</style>
+
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// ================================================================
+//  RAILSYNC — LIVE STATUS ENGINE
+// ================================================================
+
+var map, trainData = [], stationData = [], selectedTrainId = null;
+var trainLayers   = {};   // trainId → { bgLine, glowLine, marker:null }
+var stationMarkers = [];
+var animFrames    = {};   // trainId → requestAnimationFrame handle
+var trainProgress = {};   // trainId → 0..1 fraction along route
+var trainPhase    = {};   // trainId → 'forward'|'waiting_dest'|'reverse'|'waiting_source'
+var trainWaitMs   = {};   // trainId → remaining wait in ms
+const ANIM_SPEED = 0.00004; // fraction of route per ms
+
+
+// ── Zoom-glitch guard ───────────────────────────────────────────
+// During Leaflet zoom, the SVG pane is scaled via CSS transform.
+// Simultaneously calling setLatLngs() causes a 1-frame positional
+// conflict. We freeze all polyline updates during that window.
+var isZooming = false;
+
+// ── Clock ───────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('ls-clock').textContent =
+    now.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit', hour12:false}) +
+    ' IST · ' + now.toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'});
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// ── Map init ─────────────────────────────────────────────────────
+map = L.map('ls-map', {
+  center: [22.9, 80.0],
+  zoom: 5,
+  zoomControl: false,
+  attributionControl: false,
+  minZoom: 4,
+  maxZoom: 12,
+  // Lock panning to India bounds roughly
+  maxBounds: [[5.5, 62.0], [37.5, 100.0]],
+  maxBoundsViscosity: 0.9,
+});
+
+// ── NO tile layer — pure India GeoJSON ──
+// India state capitals lookup
+const STATE_CAPITALS = {
+  "Andhra Pradesh":    { name: "Amaravati",     lat: 16.5150, lon: 80.5158 },
+  "Arunachal Pradesh": { name: "Itanagar",      lat: 27.0844, lon: 93.6053 },
+  "Assam":             { name: "Dispur",         lat: 26.1445, lon: 91.7362 },
+  "Bihar":             { name: "Patna",          lat: 25.5941, lon: 85.1376 },
+  "Chhattisgarh":      { name: "Raipur",         lat: 21.2514, lon: 81.6296 },
+  "Goa":               { name: "Panaji",         lat: 15.4909, lon: 73.8278 },
+  "Gujarat":           { name: "Gandhinagar",    lat: 23.2156, lon: 72.6369 },
+  "Haryana":           { name: "Chandigarh",     lat: 30.7333, lon: 76.7794 },
+  "Himachal Pradesh":  { name: "Shimla",         lat: 31.1048, lon: 77.1734 },
+  "Jharkhand":         { name: "Ranchi",         lat: 23.3441, lon: 85.3096 },
+  "Karnataka":         { name: "Bengaluru",      lat: 12.9716, lon: 77.5946 },
+  "Kerala":            { name: "Thiruvananthapuram", lat: 8.5241, lon: 76.9366 },
+  "Madhya Pradesh":    { name: "Bhopal",         lat: 23.2599, lon: 77.4126 },
+  "Maharashtra":       { name: "Mumbai",         lat: 19.0760, lon: 72.8777 },
+  "Manipur":           { name: "Imphal",         lat: 24.8170, lon: 93.9368 },
+  "Meghalaya":         { name: "Shillong",       lat: 25.5788, lon: 91.8933 },
+  "Mizoram":           { name: "Aizawl",         lat: 23.7271, lon: 92.7176 },
+  "Nagaland":          { name: "Kohima",         lat: 25.6751, lon: 94.1086 },
+  "Odisha":            { name: "Bhubaneswar",    lat: 20.2961, lon: 85.8245 },
+  "Punjab":            { name: "Chandigarh",     lat: 30.7333, lon: 76.7794 },
+  "Rajasthan":         { name: "Jaipur",         lat: 26.9124, lon: 75.7873 },
+  "Sikkim":            { name: "Gangtok",        lat: 27.3389, lon: 88.6065 },
+  "Tamil Nadu":        { name: "Chennai",        lat: 13.0827, lon: 80.2707 },
+  "Telangana":         { name: "Hyderabad",      lat: 17.3850, lon: 78.4867 },
+  "Tripura":           { name: "Agartala",       lat: 23.8315, lon: 91.2868 },
+  "Uttar Pradesh":     { name: "Lucknow",        lat: 26.8467, lon: 80.9462 },
+  "Uttarakhand":       { name: "Dehradun",       lat: 30.3165, lon: 78.0322 },
+  "West Bengal":       { name: "Kolkata",        lat: 22.5726, lon: 88.3639 },
+  "Delhi":             { name: "New Delhi",      lat: 28.6139, lon: 77.2090 },
+  "Jammu and Kashmir": { name: "Srinagar",      lat: 34.0837, lon: 74.7973 },
+  "Ladakh":            { name: "Leh",            lat: 34.1526, lon: 77.5771 },
+  "Chandigarh":        { name: "Chandigarh",     lat: 30.7333, lon: 76.7794 },
+  "Dadra and Nagar Haveli and Daman and Diu": { name: "Daman", lat: 20.3974, lon: 72.8328 },
+  "Lakshadweep":       { name: "Kavaratti",      lat: 10.5669, lon: 72.6420 },
+  "Puducherry":        { name: "Puducherry",     lat: 11.9416, lon: 79.8083 },
+  "Andaman and Nicobar Islands": { name: "Port Blair", lat: 11.6234, lon: 92.7265 },
+};
+
+// Vivid state color palette — no longer used for fill, kept for train routes
+const STATE_COLORS = [
+  '#6c63ff','#22c55e','#f59e0b','#ef4444','#06b6d4',
+  '#a78bfa','#34d399','#fb923c','#f472b6','#60a5fa',
+];
+
+var indiaGeoJsonLayer = null;
+var capitalMarkers = {};   // keyed by lowercased capital city name
+var stateLabelLayers = [];
+
+// Load India states GeoJSON — lightweight simplified version first (1.4MB vs 22MB)
+fetch('/static/india_simple.geojson')
+  .then(r => { if (!r.ok) throw new Error('simple fail'); return r.json(); })
+  .then(geojson => renderIndiaMap(geojson))
+  .catch(() =>
+    fetch('/static/india.geojson')
+      .then(r => { if (!r.ok) throw new Error('full fail'); return r.json(); })
+      .then(geojson => renderIndiaMap(geojson))
+      .catch(() =>
+        fetch('https://raw.githubusercontent.com/datameet/maps/master/States/india-composite.geojson')
+          .then(r => { if (!r.ok) throw new Error('datameet fail'); return r.json(); })
+          .then(geojson => renderIndiaMap(geojson))
+          .catch(err => console.warn('All India GeoJSON sources failed:', err))
+      )
+  );
+
+
+function renderIndiaMap(geojson) {
+  // Single uniform style for all states — border only, no fill color differentiation
+  const BORDER_COLOR = 'rgba(160,180,220,0.45)';  // light cool-grey, subtle
+
+  indiaGeoJsonLayer = L.geoJSON(geojson, {
+    style: function() {
+      return {
+        fillColor: '#0d1120',   // nearly same as map background — invisible fill
+        fillOpacity: 0.0,       // no fill at all
+        color: BORDER_COLOR,
+        weight: 1.2,
+        opacity: 1,
+        className: 'india-state',
+      };
+    },
+    onEachFeature: function(feature, layer) {
+      const rawName = feature.properties.NAME_1 || feature.properties.ST_NM || feature.properties.name || feature.properties.NAME || '';
+
+      // Tooltip with state name (permanent, centered)
+      if (rawName) {
+        layer.bindTooltip(rawName, {
+          permanent: true,
+          direction: 'center',
+          className: 'india-state-label',
+          sticky: false,
+          interactive: false,
+          offset: [0, 0],
+        });
+      }
+    }
+  }).addTo(map);
+
+  // Capital markers are NOT added here — they are added in renderStationMarkers()
+  // AFTER the API data loads, so we can correctly decide:
+  //   station + capital at same location → RED
+  //   capital only (no station nearby)   → YELLOW
+  //   regular station                    → GREEN
+
+  // Fit map to India bounds
+  try {
+    const bounds = indiaGeoJsonLayer.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
+  } catch(e) {}
+}
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+map.on('zoomstart', function() {
+  isZooming = true;
+  // Instantly hide glow trails so they don't smear during zoom CSS transform
+  Object.values(trainLayers).forEach(function(layers) {
+    if (layers.glowLine) layers.glowLine.setStyle({ opacity: 0 });
+  });
+});
+
+map.on('zoomend', function() {
+  isZooming = false;
+  // Restore glow trail opacity per-train (respecting current filter state)
+  Object.entries(trainLayers).forEach(function([tid, layers]) {
+    if (!layers.glowLine) return;
+    // If a specific train is filtered, only restore visible ones
+    const chip = document.querySelector('.ls-chip.active');
+    const activeId = chip ? chip.dataset.id : 'all';
+    const visible = activeId === 'all' || String(tid) === String(activeId);
+    layers.glowLine.setStyle({ opacity: visible ? 0.9 : 0 });
+  });
+});
+
+// ── Fetch API data with timeout ───────────────────────────────────
+const _apiCtrl = new AbortController();
+const _apiTimeout = setTimeout(() => _apiCtrl.abort(), 8000); // 8s hard timeout
+
+fetch('/admin/api/live-status', { signal: _apiCtrl.signal })
+  .then(r => {
+    clearTimeout(_apiTimeout);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(data => {
+    trainData   = data.trains   || [];
+    stationData = data.stations || [];
+
+    // Hide loading overlay
+    const ld = document.getElementById('ls-loading');
+    ld.style.opacity = '0';
+    setTimeout(() => ld.style.display = 'none', 500);
+
+    updateStats();
+    renderStationMarkers();
+    renderTrainLayers();
+    buildPanel();
+    buildLegend();
+  })
+  .catch(err => {
+    clearTimeout(_apiTimeout);
+    const ld = document.getElementById('ls-loading');
+    ld.innerHTML =
+      '<i class="fa-solid fa-circle-xmark" style="color:#ef4444;font-size:28px"></i>' +
+      '<div style="color:#ef4444;font-size:13px">' +
+        (err.name === 'AbortError' ? 'Request timed out.<br>Server may be slow.' : 'Failed to load data.<br>Check server logs.') +
+      '</div>';
+    console.error('LiveStatus API error:', err);
+  });
+
+// ── Stats bar ────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('stat-trains').textContent = trainData.length;
+  document.getElementById('stat-stations').textContent = stationData.length;
+  const delayed = trainData.filter(t => t.delay_minutes > 0).length;
+  document.getElementById('stat-delayed').textContent = delayed;
+  const totalKm = Math.round(trainData.reduce((s, t) => s + (t.total_route_km || 0), 0));
+  document.getElementById('stat-km').textContent = totalKm.toLocaleString('en-IN') + ' km';
+}
+
+// ── Station + Capital markers (all decided together after API load) ───────────
+// COLOUR RULES:
+//   🔴 Red    — railway station that is also a state capital
+//   🟡 Yellow — state capital that has NO railway station nearby
+//   🟢 Green  — regular railway station
+//
+// Capitals are matched to stations by coordinate proximity (≤50 km)
+// to avoid city-name mismatch (e.g. 'New Delhi' vs 'Delhi').
+function renderStationMarkers() {
+  const THRESHOLD_KM = 50;   // capitals within 50 km of a station → same location
+
+  // Build a set of capital lat/lon → state name (for fast matching)
+  const capitals = Object.entries(STATE_CAPITALS).map(([state, cap]) => ({
+    state, name: cap.name, lat: cap.lat, lon: cap.lon, matched: false
+  }));
+
+  // Helper: haversine km
+  function km(lat1, lon1, lat2, lon2) {
+    const R = 6371, r = Math.PI / 180;
+    const dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  // For each station, check if it is near any capital
+  stationData.forEach(s => {
+    // Find nearest capital within threshold
+    let nearestCap = null;
+    let minDist = Infinity;
+    capitals.forEach(cap => {
+      const d = km(s.lat, s.lon, cap.lat, cap.lon);
+      if (d < THRESHOLD_KM && d < minDist) {
+        minDist = d;
+        nearestCap = cap;
+      }
+    });
+
+    const isCapital = nearestCap !== null;
+    if (isCapital) nearestCap.matched = true;  // mark capital as covered
+
+    const COLOR  = isCapital ? '#ef4444' : '#22c55e';
+    const BORDER = isCapital ? 'rgba(239,68,68,0.35)' : 'rgba(34,197,94,0.35)';
+    const SIZE   = isCapital ? 9 : 7;
+
+    const icon = L.divIcon({
+      html: `<div style="width:${SIZE}px;height:${SIZE}px;background:${COLOR};border:1.5px solid ${BORDER};border-radius:50%;box-shadow:0 0 6px ${COLOR}88"></div>`,
+      iconSize:   [SIZE, SIZE],
+      iconAnchor: [SIZE/2, SIZE/2],
+      className:  'station-icon',
+    });
+
+    const tooltipLabel = isCapital
+      ? `<b style="color:${COLOR}">${escHtml(s.name)}</b><div style="color:#aaa;font-size:10px">${escHtml(s.city)} &mdash; &#9733; ${escHtml(nearestCap.name)} (${escHtml(nearestCap.state)} Capital)${s.is_junction ? ' · Junction' : ''}</div>`
+      : `<b style="color:${COLOR}">${escHtml(s.name)}</b><div style="color:#aaa;font-size:10px">${escHtml(s.city)}${s.state ? ', ' + escHtml(s.state) : ''}${s.is_junction ? ' · Junction' : ''}</div>`;
+
+    L.marker([s.lat, s.lon], { icon, zIndexOffset: 200 })
+      .bindTooltip(`<div style="font-family:'Space Grotesk',sans-serif;font-size:12px">${tooltipLabel}</div>`,
+        { direction: 'top', offset: [0, -6], className: 'rs-tooltip' })
+      .addTo(map);
+
+    stationMarkers.push({ lat: s.lat, lon: s.lon });
+  });
+
+  // For any capital that was NOT matched to a station → yellow dot
+  capitals.forEach(cap => {
+    if (cap.matched) return;  // already covered by a red station dot
+
+    const capIcon = L.divIcon({
+      html: `<div style="width:10px;height:10px;background:#ffd93d;border:2px solid rgba(255,217,61,0.5);border-radius:50%;box-shadow:0 0 6px rgba(255,217,61,0.6)"></div>`,
+      iconSize: [10, 10],
+      iconAnchor: [5, 5],
+      className: 'capital-icon',
+    });
+
+    L.marker([cap.lat, cap.lon], { icon: capIcon, zIndexOffset: 300 })
+      .bindTooltip(
+        `<div style="font-family:'Space Grotesk',sans-serif;font-size:12px"><b style="color:#ffd93d">&#9733; ${escHtml(cap.name)}</b><div style="color:#aaa;font-size:10px">${escHtml(cap.state)} Capital</div></div>`,
+        { direction: 'top', offset: [0, -8], className: 'rs-tooltip' }
+      )
+      .addTo(map);
+  });
+}
+
+
+
+
+//
+// Each train has TWO layers:
+//   1. bgLine  — dashed route polyline (always visible, dimmed)
+//   2. glowLine — animated glow trail that travels forward then reverses
+//
+// No train icon/marker. Direction-only line animation.
+//
+// State machine per train:
+//   phase: 'forward'        → progress 0→1, glow trail advances
+//          'waiting_dest'   → paused at destination, countdown
+//          'reverse'        → progress 1→0, glow trail retreats
+//          'waiting_source' → paused at source, countdown
+//   then repeats.
+
+// ── State stores ─────────────────────────────────────────────────
+var trainPhase    = {};   // train_id → phase string
+var trainWaitMs   = {};   // train_id → remaining wait milliseconds
+var lastTs        = {};   // train_id → last animation timestamp
+
+// Interpolate a position along a polyline by fraction t ∈ [0,1]
+function lerpAlongRoute(stops, t) {
+  if (!stops.length) return null;
+  if (t <= 0) return { lat: stops[0].lat, lon: stops[0].lon };
+  if (t >= 1) return { lat: stops[stops.length-1].lat, lon: stops[stops.length-1].lon };
+
+  const segs = [];
+  let total = 0;
+  for (let i = 0; i < stops.length - 1; i++) {
+    const d = haversine(stops[i].lat, stops[i].lon, stops[i+1].lat, stops[i+1].lon);
+    segs.push(d);
+    total += d;
+  }
+
+  let dist = t * total;
+  for (let i = 0; i < segs.length; i++) {
+    if (dist <= segs[i]) {
+      const st = dist / segs[i];
+      return {
+        lat: stops[i].lat   + st * (stops[i+1].lat   - stops[i].lat),
+        lon: stops[i].lon   + st * (stops[i+1].lon   - stops[i].lon),
+      };
+    }
+    dist -= segs[i];
+  }
+  return { lat: stops[stops.length-1].lat, lon: stops[stops.length-1].lon };
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// Compute wait duration in ms from turnaround_minutes + anim_speed_scale
+// anim_speed_scale = animation-seconds per real-hour of wait
+function calcWaitMs(train) {
+  const hrs   = (train.turnaround_minutes || 360) / 60;   // real hours
+  const scale = train.anim_speed_scale   || 8.0;           // anim-sec per real-hour
+  return hrs * scale * 1000;                                // → milliseconds
+}
+
+// ── Time-based position init ──────────────────────────────────────
+// If a journey_start_datetime is set, calculate exact position from elapsed time.
+// Otherwise fall back to random cosmetic animation.
+function initProgress(train) {
+  if (!train.stops || !train.stops.length) return 0;
+
+  const dir = train.journey_direction || 'idle';
+  const startIso = train.journey_start_datetime;
+
+  if (startIso && dir !== 'idle' && (train.total_route_minutes || 0) > 0) {
+    const startMs  = new Date(startIso).getTime();
+    const nowMs    = Date.now();
+    const elapsedMs = nowMs - startMs;
+    const totalMs  = train.total_route_minutes * 60 * 1000;
+
+    // Clamp 0..1
+    let t = Math.max(0, Math.min(1, elapsedMs / totalMs));
+    if (dir === 'reverse') t = Math.max(0, Math.min(1, 1 - t));
+    return t;
+  }
+
+  // Fallback: cosmetic random-ish start
+  let idx = train.stops.findIndex(s => s.station_id === train.current_station_id);
+  if (idx < 0) idx = 0;
+  const base = idx / Math.max(train.stops.length - 1, 1);
+  const step = 1  / Math.max(train.stops.length - 1, 1);
+  return Math.min(1, base + step * (0.3 + Math.random() * 0.4));
+}
+
+// ── Phase init from direction ─────────────────────────────────────
+function initPhase(train) {
+  const dir = train.journey_direction || 'idle';
+  if (dir === 'reverse') return 'reverse';
+  if (dir === 'idle')    return 'forward'; // still animate cosmetically
+  return 'forward';
+}
+
+
+function renderTrainLayers() {
+  injectSvgGlowFilter();
+
+  trainData.forEach(train => {
+    if (!train.stops || train.stops.length < 2) return;
+    const latlngs = train.stops.map(s => [s.lat, s.lon]);
+    const color   = train.color;
+
+    // 1. Background route — dashed, dimmed
+    const bgLine = L.polyline(latlngs, {
+      color, weight: 3, opacity: 0.25,
+      dashArray: '8 6', lineCap: 'round', lineJoin: 'round',
+    }).addTo(map);
+
+    // 2. Glow trail — solid, bright, animated
+    const glowLine = L.polyline([], {
+      color, weight: 4, opacity: 0.9,
+      lineCap: 'round', lineJoin: 'round',
+      className: 'glow-line',
+    }).addTo(map);
+
+    glowLine.on('add', function() {
+      const path = glowLine.getElement();
+      if (path) path.style.filter = `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px ${color}66)`;
+    });
+
+    // Initialise state
+    const initProg  = initProgress(train);
+    const initPh    = initPhase(train);
+    trainProgress[train.train_id] = initProg;
+    trainPhase[train.train_id]    = initPh;
+    trainWaitMs[train.train_id]   = 0;
+
+    // No marker — lines only
+    trainLayers[train.train_id] = { bgLine, glowLine, marker: null };
+
+    startAnimation(train);
+  });
+}
+
+// ── Per-train animation loop ──────────────────────────────────────
+function startAnimation(train) {
+  if (!trainLayers[train.train_id]) return;
+  lastTs[train.train_id] = null;
+
+  const TRAIL_LEN = 0.28;   // glow trail = 28% of route length
+
+  function tick(ts) {
+    if (!lastTs[train.train_id]) lastTs[train.train_id] = ts;
+    const dtMs = ts - lastTs[train.train_id];
+    lastTs[train.train_id] = ts;
+
+    const layers = trainLayers[train.train_id];
+    if (!layers) return;
+
+    let t     = trainProgress[train.train_id];
+    let phase = trainPhase[train.train_id];
+
+    // ── State machine ───────────────────────────────────────────
+    if (phase === 'forward') {
+      t += ANIM_SPEED * dtMs;
+      if (t >= 1) {
+        t = 1;
+        trainPhase[train.train_id]  = 'waiting_dest';
+        trainWaitMs[train.train_id] = calcWaitMs(train);
+      }
+
+    } else if (phase === 'waiting_dest') {
+      trainWaitMs[train.train_id] -= dtMs;
+      if (trainWaitMs[train.train_id] <= 0) {
+        trainPhase[train.train_id]  = 'reverse';
+        trainWaitMs[train.train_id] = 0;
+      }
+
+    } else if (phase === 'reverse') {
+      t -= ANIM_SPEED * dtMs;
+      if (t <= 0) {
+        t = 0;
+        trainPhase[train.train_id]  = 'waiting_source';
+        trainWaitMs[train.train_id] = calcWaitMs(train);
+      }
+
+    } else if (phase === 'waiting_source') {
+      trainWaitMs[train.train_id] -= dtMs;
+      if (trainWaitMs[train.train_id] <= 0) {
+        trainPhase[train.train_id]  = 'forward';
+        trainWaitMs[train.train_id] = 0;
+        t = 0;
+      }
+    }
+
+    trainProgress[train.train_id] = t;
+
+    // ── DOM updates (skip during zoom) ──────────────────────────
+    if (!isZooming) {
+      let trailStart, trailEnd;
+
+      if (phase === 'forward' || phase === 'waiting_dest') {
+        // Trail advances forward: from (t - TRAIL_LEN) to t
+        trailStart = Math.max(0, t - TRAIL_LEN);
+        trailEnd   = t;
+      } else {
+        // Trail retreats: from t to (t + TRAIL_LEN)
+        trailStart = t;
+        trailEnd   = Math.min(1, t + TRAIL_LEN);
+      }
+
+      // Build trail points
+      const trailPoints = [];
+      const steps = 40;
+      for (let i = 0; i <= steps; i++) {
+        const frac = trailStart + (trailEnd - trailStart) * (i / steps);
+        const p = lerpAlongRoute(train.stops, frac);
+        if (p) trailPoints.push([p.lat, p.lon]);
+      }
+      layers.glowLine.setLatLngs(trailPoints);
+
+      // Pulse (dim glow trail) when waiting at a terminal
+      if (phase === 'waiting_dest' || phase === 'waiting_source') {
+        const pulse = 0.4 + 0.5 * Math.abs(Math.sin(ts / 600));
+        const el = layers.glowLine.getElement();
+        if (el) el.style.opacity = String(pulse);
+      } else {
+        const el = layers.glowLine.getElement();
+        if (el) el.style.opacity = '0.9';
+      }
+    }
+
+    animFrames[train.train_id] = requestAnimationFrame(tick);
+  }  // end tick
+  animFrames[train.train_id] = requestAnimationFrame(tick);
+}  // end startAnimation
+
+// ── SVG Glow filter (injected once) ─────────────────────────────
+
+function injectSvgGlowFilter() {
+  if (document.getElementById('rs-svg-defs')) return;
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('id', 'rs-svg-defs');
+  svg.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden');
+  svg.innerHTML = `<defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>`;
+  document.body.appendChild(svg);
+}
+
+// ── Panel rendering ──────────────────────────────────────────────
+function buildPanel() {
+  const list = document.getElementById('ls-train-list');
+  if (!trainData.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:13px">No train routes found.<br>Add trains and stops first.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  trainData.forEach((train, i) => {
+    const card = document.createElement('div');
+    card.className = 'ls-train-card';
+    card.id = 'card-' + train.train_id;
+    card.style.animationDelay = (i * 0.05) + 's';
+    card.onclick = () => selectTrain(train.train_id);
+
+    const curStop = train.stops.find(s => s.station_id === train.current_station_id);
+    const lastStop = train.stops[train.stops.length - 1];
+    const firstStop = train.stops[0];
+
+    const delayBadge = train.delay_minutes > 0
+      ? `<span class="ls-delay-badge">+${train.delay_minutes} min delay</span>`
+      : `<span class="ls-ok-badge">On Time</span>`;
+
+    // Build stop timeline
+    let stopHtml = '';
+    train.stops.forEach((stop, si) => {
+      const isCurrent = stop.station_id === train.current_station_id;
+      const isPast = si < train.stops.findIndex(s => s.station_id === train.current_station_id);
+      const isLast = si === train.stops.length - 1;
+      const dotOpacity = isPast ? '0.35' : isCurrent ? '1' : '0.6';
+      stopHtml += `
+        <div class="ls-stop-item">
+          <div class="ls-stop-spine">
+            <div class="ls-stop-dot ${isCurrent ? 'current' : ''}"
+                 style="color:${train.color};opacity:${dotOpacity}"></div>
+            ${!isLast ? `<div class="ls-stop-line" style="color:${train.color}"></div>` : ''}
+          </div>
+          <div class="ls-stop-info" style="opacity:${isPast ? '0.4' : '1'}">
+            <div class="ls-stop-name">${escHtml(stop.name)}${stop.is_junction ? ' <span style="color:#ffd93d;font-size:10px">⬡</span>' : ''}</div>
+            <div class="ls-stop-meta">${escHtml(stop.city)}${stop.cumulative_km > 0 ? ' · ' + stop.cumulative_km + ' km' : ''}</div>
+          </div>
+          <div class="ls-stop-times">
+            ${stop.arrival ? '<div>' + stop.arrival + '</div>' : ''}
+            ${stop.departure ? '<div style="color:var(--accent2)">' + stop.departure + '</div>' : ''}
+          </div>
+        </div>`;
+    });
+
+    card.innerHTML = `
+      <div class="ls-train-card-header">
+        <div class="ls-color-dot" style="background:${train.color};box-shadow:0 0 8px ${train.color}88"></div>
+        <div class="ls-train-name">${escHtml(train.train_name)}</div>
+        <div class="ls-train-num">${escHtml(train.train_number)}</div>
+      </div>
+      <div class="ls-train-status">
+        <div class="ls-status-row">
+          <i class="fa-solid fa-location-dot" style="color:${train.color};font-size:11px"></i>
+          <span>Current:</span>
+          <span class="ls-status-val">${escHtml(curStop ? curStop.name : firstStop.name)}</span>
+        </div>
+        <div class="ls-status-row">
+          <i class="fa-solid fa-flag-checkered" style="font-size:11px"></i>
+          <span>Destination:</span>
+          <span class="ls-status-val">${escHtml(lastStop.name)}</span>
+        </div>
+        <div class="ls-status-row">${delayBadge}</div>
+        <div class="ls-status-row" style="margin-top:4px">
+          ${buildDirectionBadge(train)}
+          <button onclick="openScheduleModal(${train.train_id}, event)"
+            style="margin-left:auto;padding:3px 10px;font-size:10px;font-weight:700;
+                   border:1px solid ${train.color}66;border-radius:20px;background:${train.color}18;
+                   color:${train.color};cursor:pointer;letter-spacing:.4px;white-space:nowrap"
+            id="schbtn-${train.train_id}">
+            &#x23F1; Schedule
+          </button>
+        </div>
+      </div>
+      <div class="ls-stops-timeline">
+        <div class="ls-route-summary">
+          <div class="ls-route-stat">
+            <div class="ls-route-stat-label">Stops</div>
+            <div class="ls-route-stat-val" style="color:${train.color}">${train.stops.length}</div>
+          </div>
+          <div class="ls-route-stat">
+            <div class="ls-route-stat-label">Total Km</div>
+            <div class="ls-route-stat-val" style="color:var(--accent2)">${train.total_route_km > 0 ? Math.round(train.total_route_km) + ' km' : '—'}</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px">Route</div>
+        ${stopHtml}
+      </div>`;
+
+
+    list.appendChild(card);
+  });
+
+  // Add filter chips
+  buildFilterChips();
+}
+
+// \u2500\u2500 Direction badge \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function buildDirectionBadge(train) {
+  const dir = train.journey_direction || 'idle';
+  const startStr = train.journey_start_datetime;
+  const colors = { forward: '#22c55e', reverse: '#4d96ff', idle: '#888' };
+  const icons  = { forward: '&#x25B6;', reverse: '&#x25C0;', idle: '&#x23F8;' };
+  const labels = { forward: 'Forward', reverse: 'Returning', idle: 'Idle' };
+  const c = colors[dir] || '#888';
+  let dateLabel = '';
+  if (startStr && dir !== 'idle') {
+    const d = new Date(startStr);
+    dateLabel = ' · ' + d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})
+      + ' ' + d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false});
+  }
+  return `<span style="display:inline-flex;align-items:center;gap:4px;
+    background:${c}18;border:1px solid ${c}44;border-radius:20px;
+    padding:2px 8px;font-size:10px;font-weight:700;color:${c}">
+    ${icons[dir]} ${labels[dir]}${dateLabel}
+  </span>`;
+}
+
+// \u2500\u2500 Schedule Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+var _schedModalTrainId = null;
+
+function openScheduleModal(trainId, evt) {
+  if (evt) evt.stopPropagation();    // don't trigger card click/select
+  _schedModalTrainId = trainId;
+  const train = trainData.find(t => t.train_id === trainId);
+  if (!train) return;
+
+  // Pre-fill current values
+  const modal = document.getElementById('sched-modal');
+  document.getElementById('sched-train-label').textContent =
+    train.train_name + ' (' + train.train_number + ')';
+
+  const firstStop = train.stops[0];
+  const lastStop  = train.stops[train.stops.length - 1];
+  document.getElementById('sched-source-label').textContent = firstStop ? firstStop.name : '—';
+  document.getElementById('sched-dest-label').textContent   = lastStop  ? lastStop.name  : '—';
+
+  // Default datetime = now
+  const now = new Date();
+  now.setSeconds(0, 0);
+  const localIso = new Date(now.getTime() - now.getTimezoneOffset()*60000)
+    .toISOString().slice(0,16);
+  const inp = document.getElementById('sched-datetime');
+  inp.value = train.journey_start_datetime
+    ? train.journey_start_datetime.slice(0,16)
+    : localIso;
+
+  // Default direction
+  const dir = train.journey_direction || 'forward';
+  document.querySelectorAll('.sched-dir-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.dir === dir);
+  });
+
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('visible'), 10);
+}
+
+function closeScheduleModal() {
+  const modal = document.getElementById('sched-modal');
+  modal.classList.remove('visible');
+  setTimeout(() => { modal.style.display = 'none'; }, 250);
+}
+
+function saveSchedule() {
+  const trainId = _schedModalTrainId;
+  const train   = trainData.find(t => t.train_id === trainId);
+  if (!train) return;
+
+  const dtVal = document.getElementById('sched-datetime').value;
+  const dir   = document.querySelector('.sched-dir-btn.active')?.dataset.dir || 'forward';
+  const btn   = document.getElementById('sched-save-btn');
+  const msg   = document.getElementById('sched-save-msg');
+
+  btn.disabled = true;
+  msg.textContent = '';
+
+  fetch(`/admin/super/trains/${trainId}/schedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_datetime: dtVal, direction: dir })
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    if (data.ok) {
+      // Update in-memory trainData so badge re-renders correctly
+      train.journey_start_datetime = data.journey_start_datetime;
+      train.journey_direction      = data.journey_direction;
+
+      // Re-init this train's animation
+      if (animFrames[trainId]) {
+        cancelAnimationFrame(animFrames[trainId]);
+        delete animFrames[trainId];
+      }
+      const initProg = initProgress(train);
+      trainProgress[trainId] = initProg;
+      trainPhase[trainId]    = initPhase(train);
+      trainWaitMs[trainId]   = 0;
+      startAnimation(train);
+
+      msg.textContent  = '\u2713 Scheduled!';
+      msg.style.color  = 'var(--green)';
+      // Refresh card direction badge
+      buildPanel();
+      setTimeout(closeScheduleModal, 1200);
+    } else {
+      msg.textContent = '\u2717 ' + (data.error || 'Error');
+      msg.style.color = 'var(--danger)';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    msg.textContent = '\u2717 Network error';
+    msg.style.color = 'var(--danger)';
+  });
+}
+
+function buildFilterChips() {
+  const row = document.getElementById('ls-filter-row');
+  // Remove existing non-all chips
+  row.querySelectorAll('[data-id]:not([data-id="all"])').forEach(c => c.remove());
+
+  trainData.forEach(train => {
+    const chip = document.createElement('button');
+    chip.className = 'ls-chip';
+    chip.dataset.id = train.train_id;
+    chip.style.borderLeftColor = train.color;
+    chip.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${train.color};margin-right:4px;vertical-align:middle"></span>${escHtml(train.train_number)}`;
+    chip.onclick = function() { filterTrain(train.train_id, this); };
+    row.appendChild(chip);
+  });
+}
+
+// ── Legend ────────────────────────────────────────────────────────
+function buildLegend() {
+  const body = document.getElementById('ls-legend-body');
+  body.innerHTML = '';
+  trainData.forEach(train => {
+    const item = document.createElement('div');
+    item.className = 'ls-legend-item';
+    item.onclick = () => selectTrain(train.train_id);
+    item.innerHTML = `
+      <div class="ls-legend-line" style="background:${train.color};box-shadow:0 0 6px ${train.color}88"></div>
+      <div class="ls-legend-label">${escHtml(train.train_number)} · ${escHtml(train.train_name)}</div>`;
+    body.appendChild(item);
+  });
+}
+
+// ── Train selection / filter ─────────────────────────────────────
+function selectTrain(trainId) {
+  selectedTrainId = trainId === selectedTrainId ? null : trainId;
+
+  // Update card highlights
+  document.querySelectorAll('.ls-train-card').forEach(c => c.classList.remove('selected'));
+  if (selectedTrainId) {
+    const card = document.getElementById('card-' + selectedTrainId);
+    if (card) {
+      card.classList.add('selected');
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  // Update chip highlights
+  filterTrain(selectedTrainId || 'all', document.querySelector(`[data-id="${selectedTrainId || 'all'}"]`));
+
+  // Fly map to train
+  if (selectedTrainId) {
+    const train = trainData.find(t => t.train_id === selectedTrainId);
+    if (train && train.stops.length) {
+      const bounds = L.latLngBounds(train.stops.map(s => [s.lat, s.lon]));
+      map.flyToBounds(bounds, { padding: [60, 60], duration: 1.2 });
+    }
+  } else {
+    // Fly back to full India view
+    if (indiaGeoJsonLayer) {
+      try {
+        const b = indiaGeoJsonLayer.getBounds();
+        if (b.isValid()) { map.flyToBounds(b, { padding: [20,20], duration: 1.2 }); return; }
+      } catch(e) {}
+    }
+    map.flyTo([22.9, 80.0], 5, { duration: 1.2 });
+  }
+}
+
+function filterTrain(id, chipEl) {
+  // Update chip active state
+  document.querySelectorAll('.ls-chip').forEach(c => {
+    c.classList.remove('active');
+    c.style.background = 'transparent';
+  });
+  if (chipEl) {
+    chipEl.classList.add('active');
+    if (id === 'all') chipEl.style.background = 'rgba(108,99,255,0.2)';
+    else {
+      const train = trainData.find(t => t.train_id == id);
+      if (train) chipEl.style.background = train.color + '22';
+    }
+  }
+
+  // Show/hide train layers (no marker — lines only)
+  Object.entries(trainLayers).forEach(([tid, layers]) => {
+    const visible = (id === 'all') || (String(tid) === String(id));
+    layers.bgLine.setStyle({ opacity: visible ? 0.25 : 0.03 });
+    layers.glowLine.setStyle({ opacity: visible ? 0.9 : 0.0 });
+  });
+}
+
+// ── Train popup HTML ─────────────────────────────────────────────
+function buildTrainPopupHtml(train) {
+  const curStop = train.stops.find(s => s.station_id === train.current_station_id);
+  const lastStop = train.stops[train.stops.length - 1];
+  return `
+    <div style="font-family:'Space Grotesk',sans-serif;min-width:200px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:2px;color:${train.color}">${escHtml(train.train_number)}</div>
+      <div style="font-size:13px;margin-bottom:8px">${escHtml(train.train_name)}</div>
+      <div style="font-size:12px;color:#aaa;margin-bottom:3px">
+        📍 <b style="color:#fff">${escHtml(curStop ? curStop.name : train.stops[0].name)}</b>
+      </div>
+      <div style="font-size:12px;color:#aaa;margin-bottom:6px">
+        🏁 ${escHtml(lastStop.name)}
+      </div>
+      ${train.delay_minutes > 0
+        ? `<div style="background:rgba(239,68,68,0.15);color:#ef4444;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">+${train.delay_minutes} min delay</div>`
+        : `<div style="background:rgba(34,197,94,0.15);color:#22c55e;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">✓ On Time</div>`
+      }
+    </div>`;
+}
+
+// ── Utility ───────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Custom popup styles ──────────────────────────────────────────
+const style = document.createElement('style');
+style.textContent = `
+  .rs-popup .leaflet-popup-content-wrapper {
+    background: rgba(13,16,26,0.97) !important;
+    border: 1px solid rgba(108,99,255,0.3) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    color: #e8eaf0 !important;
+    padding: 14px 16px !important;
+    backdrop-filter: blur(12px);
+  }
+  .rs-popup .leaflet-popup-tip { background: rgba(13,16,26,0.97) !important; }
+  .rs-popup .leaflet-popup-content { margin: 0 !important; }
+  .glow-line path { transition: d 0.08s linear; }
+
+  /* Capital / state tooltips */
+  .rs-tooltip.leaflet-tooltip {
+    background: rgba(13,16,26,0.95) !important;
+    border: 1px solid rgba(255,217,61,0.3) !important;
+    border-radius: 8px !important;
+    color: #e8eaf0 !important;
+    font-family: 'Space Grotesk', sans-serif;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+    padding: 6px 10px !important;
+  }
+  .rs-tooltip.leaflet-tooltip::before { border-top-color: rgba(255,217,61,0.3) !important; }
+
+  /* Hide leaflet attribution */
+  .leaflet-control-attribution { display: none !important; }
+`;
+document.head.appendChild(style);
+
+// ── Window resize ────────────────────────────────────────────────
+window.addEventListener('resize', () => map.invalidateSize());
+</script>
+{% endblock %}

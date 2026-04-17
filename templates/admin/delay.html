@@ -20,15 +20,9 @@
           {% endfor %}
         </select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="form-group">
-          <label>Delay (minutes)</label>
-          <input type="number" name="delay_minutes" placeholder="30" required min="1">
-        </div>
-        <div class="form-group">
-          <label>ETA to fix (minutes)</label>
-          <input type="number" name="eta_fixed" placeholder="60" value="60" min="1">
-        </div>
+      <div class="form-group">
+        <label>Delay (minutes)</label>
+        <input type="number" name="delay_minutes" placeholder="e.g. 30" required min="1">
       </div>
       <div class="form-group">
         <label>Problem Description</label>

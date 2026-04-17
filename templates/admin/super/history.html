@@ -1,0 +1,400 @@
+{% extends 'base.html' %}
+{% block title %}System History{% endblock %}
+{% block page_title %}System Directory &amp; History{% endblock %}
+
+{% block content %}
+<style>
+.section-nav { display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.section-tab {
+  font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer;
+  padding: 8px 18px; border-radius: 8px; transition: all 0.2s; user-select: none;
+}
+.section-tab:hover { color: var(--text); background: var(--bg3); }
+.section-tab.active { background: var(--accent); color: #fff; }
+
+.sub-nav { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.sub-pill {
+  padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; color: var(--muted); border: 1px solid var(--border2);
+  background: transparent; user-select: none;
+}
+.sub-pill:hover { background: var(--bg3); color: var(--text); }
+.sub-pill.active { background: rgba(108,99,255,0.15); color: var(--accent2); border-color: var(--accent); }
+
+.tab-pane { display: none; }
+.tab-pane.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.search-wrap { position: relative; max-width: 400px; margin-bottom: 16px; }
+.hist-search { padding-left: 38px !important; border-radius: 20px !important; }
+.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+.modal-box {
+  background: var(--card-bg); border: 1px solid var(--border2);
+  border-radius: 16px; width: 100%; max-width: 420px; padding: 28px;
+  transform: translateY(24px); transition: transform 0.25s;
+  position: relative;
+}
+.modal-overlay.open .modal-box { transform: translateY(0); }
+.modal-close {
+  position: absolute; top: 16px; right: 18px;
+  background: none; border: none; color: var(--muted);
+  font-size: 18px; cursor: pointer; line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+
+/* Toast */
+.toast-wrap {
+  position: fixed; bottom: 28px; right: 28px; z-index: 99999;
+  display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+}
+.toast {
+  min-width: 280px; max-width: 380px;
+  padding: 14px 18px; border-radius: 12px;
+  font-size: 14px; font-weight: 500;
+  display: flex; align-items: center; gap: 10px;
+  animation: slideUp .3s ease; pointer-events: auto;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5);
+}
+.toast-ok  { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.4); color: #22c55e; }
+.toast-err { background: rgba(239,68,68,.15);  border: 1px solid rgba(239,68,68,.4); color: #ef4444; }
+@keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+</style>
+
+<!-- Toast container -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="card">
+  <!-- Main Tabs -->
+  <div class="section-nav">
+    <div class="section-tab active" data-main="users"><i class="fa-solid fa-users" style="margin-right:6px"></i>User History</div>
+    <div class="section-tab" data-main="masters"><i class="fa-solid fa-user-tie" style="margin-right:6px"></i>Station Masters</div>
+  </div>
+
+  <!-- ═══════════ USERS PANE ═══════════ -->
+  <div id="pane-users" class="tab-pane active">
+    <div class="sub-nav">
+      <div class="sub-pill active" data-sub="users" data-key="current">Current Users ({{ current_users|length }})</div>
+      <div class="sub-pill" data-sub="users" data-key="old">Old Users ({{ old_users|length }})</div>
+      <div class="sub-pill" data-sub="users" data-key="all">All Users ({{ all_users|length }})</div>
+    </div>
+    <div class="search-wrap">
+      <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input type="text" class="hist-search" id="user-search" placeholder="Search by name, email or phone…">
+    </div>
+
+    <div id="sub-users-current" class="sub-pane-users">
+      <div class="table-wrap">
+        <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for u in current_users %}
+            <tr>
+              <td class="mono">#{{ u.user_id }}</td>
+              <td class="s">{{ u.name }}</td>
+              <td class="s">{{ u.email }}</td>
+              <td class="s">{{ u.phone }}</td>
+              <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+              <td><span class="badge badge-blue" style="font-size:11px"><i class="fa-solid fa-eye" style="margin-right:4px"></i>View Only</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No current users.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="sub-users-old" class="sub-pane-users" style="display:none">
+      <div class="table-wrap">
+        <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for u in old_users %}
+            <tr>
+              <td class="mono">#{{ u.user_id }}</td>
+              <td class="s">{{ u.name }}</td>
+              <td class="s">{{ u.email }}</td>
+              <td class="s">{{ u.phone }}</td>
+              <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+              <td><span class="badge badge-blue" style="font-size:11px"><i class="fa-solid fa-eye" style="margin-right:4px"></i>View Only</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No old users.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="sub-users-all" class="sub-pane-users" style="display:none">
+      <div class="table-wrap">
+        <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for u in all_users %}
+            <tr>
+              <td class="mono">#{{ u.user_id }}</td>
+              <td class="s">{{ u.name }}</td>
+              <td class="s">{{ u.email }}</td>
+              <td class="s">{{ u.phone }}</td>
+              <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+              <td><span class="badge badge-blue" style="font-size:11px"><i class="fa-solid fa-eye" style="margin-right:4px"></i>View Only</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No users found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /pane-users -->
+
+  <!-- ═══════════ MASTERS PANE ═══════════ -->
+  <div id="pane-masters" class="tab-pane">
+    <div class="sub-nav">
+      <div class="sub-pill active" data-sub="masters" data-key="perm">Permanent ({{ permanent_masters|length }})</div>
+      <div class="sub-pill" data-sub="masters" data-key="temp">Temporary ({{ temp_masters|length }})</div>
+      <div class="sub-pill" data-sub="masters" data-key="super">Super Admins ({{ super_admins|length }})</div>
+    </div>
+    <div class="search-wrap">
+      <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input type="text" class="hist-search" id="master-search" placeholder="Search by name, email or phone…">
+    </div>
+
+    <div id="sub-masters-perm" class="sub-pane-masters">
+      <div class="table-wrap">
+        <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Station</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for m in permanent_masters %}
+            <tr>
+              <td class="mono">M-{{ m.master_id }}</td>
+              <td class="s">{{ m.name }}</td>
+              <td class="s">{{ m.email }}</td>
+              <td class="s">{{ m.phone }}</td>
+              <td>{{ m.station.station_name if m.station else '—' }}</td>
+              <td><button class="btn btn-ghost btn-sm pwd-btn" data-type="master" data-id="{{ m.master_id }}" data-name="{{ m.name | e }}"><i class="fa-solid fa-key"></i> Change Password</button></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No permanent masters.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="sub-masters-temp" class="sub-pane-masters" style="display:none">
+      <div class="table-wrap">
+        <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for m in temp_masters %}
+            <tr>
+              <td class="mono">M-{{ m.master_id }}</td>
+              <td class="s">{{ m.name }}</td>
+              <td class="s">{{ m.email }}</td>
+              <td class="s">{{ m.phone }}</td>
+              <td><span class="badge badge-amber">Temporary Pool</span></td>
+              <td><button class="btn btn-ghost btn-sm pwd-btn" data-type="master" data-id="{{ m.master_id }}" data-name="{{ m.name | e }}"><i class="fa-solid fa-key"></i> Change Password</button></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No temporary masters.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="sub-masters-super" class="sub-pane-masters" style="display:none">
+      <div class="table-wrap">
+        <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for m in super_admins %}
+            <tr>
+              <td class="mono">S-{{ m.master_id }}</td>
+              <td class="s">{{ m.name }}</td>
+              <td class="s">{{ m.email }}</td>
+              <td class="s">{{ m.phone }}</td>
+              <td><span class="badge badge-purple">Super Admin</span></td>
+              <td>
+                <button class="btn btn-ghost btn-sm" disabled style="opacity:0.35;cursor:not-allowed" title="Cannot change another Super Admin's password">
+                  <i class="fa-solid fa-lock"></i> Protected
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No super admins found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /pane-masters -->
+</div><!-- /card -->
+
+<!-- Password Modal -->
+<div class="modal-overlay" id="pwdModal">
+  <div class="modal-box">
+    <button class="modal-close" id="modalCloseBtn" type="button"><i class="fa-solid fa-xmark"></i></button>
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px">
+      <i class="fa-solid fa-key" style="color:var(--amber);margin-right:8px"></i>Reset Password
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">
+      Account: <strong style="color:var(--text)" id="modalName"></strong>
+    </div>
+    <form id="pwdForm" method="POST" action="{{ url_for('admin.change_password') }}">
+      <input type="hidden" name="user_type" id="modalType">
+      <input type="hidden" name="target_id" id="modalId">
+      <div class="form-group">
+        <label for="newPwdInput">New Password</label>
+        <input type="password" id="newPwdInput" name="new_password" required minlength="4"
+               placeholder="Enter new password…" autocomplete="new-password">
+      </div>
+      <button type="submit" id="pwdSubmitBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px">
+        <i class="fa-solid fa-check"></i> Confirm Change
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  /* ── Toast ─────────────────────────────────────────── */
+  function showToast(msg, ok) {
+    var wrap  = document.getElementById('toastWrap');
+    var toast = document.createElement('div');
+    toast.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+    var icon = ok ? 'fa-circle-check' : 'fa-circle-xmark';
+    toast.innerHTML = '<i class="fa-solid ' + icon + '"></i> <span>' + String(msg).replace(/</g,'&lt;') + '</span>';
+    wrap.appendChild(toast);
+    setTimeout(function(){
+      toast.style.transition = 'opacity .4s';
+      toast.style.opacity = '0';
+      setTimeout(function(){ toast.remove(); }, 420);
+    }, 3500);
+  }
+
+  /* ── Modal ─────────────────────────────────────────── */
+  var modal     = document.getElementById('pwdModal');
+  var modalName = document.getElementById('modalName');
+  var modalType = document.getElementById('modalType');
+  var modalId   = document.getElementById('modalId');
+  var modalPwd  = document.getElementById('newPwdInput');
+  var modalClose= document.getElementById('modalCloseBtn');
+  var pwdForm   = document.getElementById('pwdForm');
+  var submitBtn = document.getElementById('pwdSubmitBtn');
+
+  function openModal(type, id, name) {
+    modalType.value       = type;
+    modalId.value         = id;
+    modalName.textContent = name;
+    modalPwd.value        = '';
+    modal.classList.add('open');
+    setTimeout(function(){ modalPwd.focus(); }, 200);
+  }
+  function closeModal() {
+    modal.classList.remove('open');
+  }
+
+  modalClose.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+
+  /* ── AJAX submit — no page redirect ────────────────── */
+  pwdForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    var fd = new FormData(pwdForm);
+    submitBtn.disabled    = true;
+    submitBtn.textContent = 'Saving…';
+
+    fetch(pwdForm.action, { method: 'POST', body: fd })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          showToast(data.message, true);
+          closeModal();
+        } else {
+          showToast(data.error || 'Something went wrong.', false);
+        }
+      })
+      .catch(function() {
+        showToast('Network error. Please try again.', false);
+      })
+      .finally(function() {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm Change';
+      });
+  });
+
+  /* ── Open modal via event delegation ───────────────── */
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.pwd-btn');
+    if (!btn) return;
+    e.preventDefault();
+    openModal(btn.dataset.type, btn.dataset.id, btn.dataset.name);
+  });
+
+  /* ── Main tab switching ─────────────────────────────── */
+  document.querySelectorAll('[data-main]').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var type = tab.dataset.main;
+      document.querySelectorAll('.section-tab').forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+      document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
+      document.getElementById('pane-' + type).classList.add('active');
+    });
+  });
+
+  /* ── Sub tab switching ──────────────────────────────── */
+  document.querySelectorAll('[data-sub]').forEach(function(pill) {
+    pill.addEventListener('click', function() {
+      var sub  = pill.dataset.sub;
+      var key  = pill.dataset.key;
+      var pane = document.getElementById('pane-' + sub);
+
+      pane.querySelectorAll('.sub-pill').forEach(function(p){ p.classList.remove('active'); });
+      pill.classList.add('active');
+      pane.querySelectorAll('.sub-pane-' + sub).forEach(function(p){ p.style.display = 'none'; });
+      document.getElementById('sub-' + sub + '-' + key).style.display = 'block';
+
+      var inp = document.getElementById(sub + '-search');
+      if (inp) { inp.value = ''; runFilter(sub); }
+    });
+  });
+
+  /* ── Live search ────────────────────────────────────── */
+  function runFilter(group) {
+    var inp = document.getElementById(group + '-search');
+    if (!inp) return;
+    var q = inp.value.toLowerCase();
+
+    var visPane = null;
+    document.querySelectorAll('.sub-pane-' + group).forEach(function(p){
+      if (p.style.display !== 'none') visPane = p;
+    });
+    if (!visPane) visPane = document.querySelector('.sub-pane-' + group);
+    if (!visPane) return;
+
+    visPane.querySelectorAll('tbody tr').forEach(function(tr){
+      var cells = tr.querySelectorAll('td.s');
+      if (!cells.length) { tr.style.display = ''; return; }
+      var text = Array.from(cells).map(function(c){ return c.textContent.toLowerCase(); }).join(' ');
+      tr.style.display = text.includes(q) ? '' : 'none';
+    });
+  }
+
+  var uSrch = document.getElementById('user-search');
+  var mSrch = document.getElementById('master-search');
+  if (uSrch) uSrch.addEventListener('input', function(){ runFilter('users'); });
+  if (mSrch) mSrch.addEventListener('input', function(){ runFilter('masters'); });
+
+})();
+</script>
+{% endblock %}

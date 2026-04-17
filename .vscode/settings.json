@@ -1,4 +1,7 @@
 {
-    "workbench.preferredHighContrastLightColorTheme": "Dark+",
-    "workbench.colorTheme": "VS Code Dark"
+  "html.validate.scripts": false,
+  "html.validate.styles": false,
+  "files.associations": {
+    "*.html": "jinja-html"
+  }
 }

@@ -214,10 +214,37 @@ def cancel_booking(booking_id):
 def track(train_id):
     train = Train.query.get_or_404(train_id)
     status = TrainStatus.query.filter_by(train_id=train_id).first()
-    routes = TrainRoute.query.filter_by(train_id=train_id).order_by(TrainRoute.stop_number).all()
+    routes = (TrainRoute.query
+              .filter_by(train_id=train_id)
+              .order_by(TrainRoute.stop_number)
+              .all())
     allocation = PlatformAllocation.query.filter_by(train_id=train_id).first()
     return render_template('user/track.html', train=train, status=status,
                            routes=routes, allocation=allocation)
+
+
+@user_bp.route('/api/track-status/<int:train_id>')
+@login_required
+@user_required
+def track_status_api(train_id):
+    """Lightweight JSON endpoint for AJAX polling — no full page reload needed."""
+    train = Train.query.get(train_id)
+    if not train:
+        return jsonify({'error': 'Not found'}), 404
+    status = TrainStatus.query.filter_by(train_id=train_id).first()
+    allocation = PlatformAllocation.query.filter_by(train_id=train_id).first()
+    return jsonify({
+        'train_id':       train_id,
+        'delay_minutes':  status.delay_minutes if status else 0,
+        'current_station_id': status.current_station_id if status else None,
+        'current_station_name': status.current_station.station_name if status else None,
+        'current_station_city': status.current_station.city if status else None,
+        'expected_arrival': status.expected_arrival.strftime('%d %b, %H:%M') if (status and status.expected_arrival) else None,
+        'last_updated':   status.last_updated.strftime('%H:%M:%S') if status else None,
+        'platform_number': allocation.platform.platform_number if allocation else None,
+        'platform_arrival': allocation.arrival_time.strftime('%H:%M') if allocation else None,
+        'platform_departure': allocation.departure_time.strftime('%H:%M') if allocation else None,
+    })
 
 
 @user_bp.route('/notifications')
