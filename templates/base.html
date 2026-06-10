@@ -319,6 +319,9 @@
           <a href="{{ url_for('admin.stations') }}" class="nav-item {% if request.endpoint == 'admin.stations' %}active{% endif %}">
             <span class="icon"><i class="fa-solid fa-city"></i></span> Network Stations
           </a>
+          <a href="{{ url_for('admin.super_drivers') }}" class="nav-item {% if request.endpoint == 'admin.super_drivers' %}active{% endif %}">
+            <span class="icon"><i class="fa-solid fa-id-card"></i></span> Train Drivers
+          </a>
           <a href="{{ url_for('admin.live_status') }}" class="nav-item {% if request.endpoint == 'admin.live_status' %}active{% endif %}" style="{% if request.endpoint == 'admin.live_status' %}background:rgba(108,99,255,0.15);{% endif %}">
             <span class="icon"><i class="fa-solid fa-satellite-dish"></i></span> Live Status
             <span style="margin-left:auto;width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;animation:liveDot 1.4s ease-in-out infinite;flex-shrink:0"></span>

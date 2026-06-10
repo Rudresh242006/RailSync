@@ -9,6 +9,18 @@ from datetime import date, datetime
 import uuid
 import random
 import string
+import math
+
+def haversine(lat1, lon1, lat2, lon2):
+    if None in (lat1, lon1, lat2, lon2):
+        return 0.0
+    R = 6371.0  # Earth radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    straight_km = R * c
+    return round(straight_km * 1.30, 1)
 
 user_bp = Blueprint('user', __name__)
 
@@ -25,9 +37,13 @@ def user_required(f):
 
 def generate_seat(train_id, journey_date):
     """Generate a random seat number (1-9 rows, A-F seats)."""
-    booked = {b.seat_number for b in Booking.query.filter_by(
+    booked = set()
+    for b in Booking.query.filter_by(
         train_id=train_id, journey_date=journey_date
-    ).filter(Booking.status != 'CANCELLED').all()}
+    ).filter(Booking.status != 'CANCELLED').all():
+        if b.seat_number:
+            booked.update([s.strip() for s in b.seat_number.split(',')])
+            
     all_seats = [f"{r}{c}" for r in range(1, 10) for c in 'ABCDEF']
     available = [s for s in all_seats if s not in booked]
     return random.choice(available) if available else None
@@ -51,10 +67,14 @@ def dashboard():
 def search():
     trains = []
     stations = Station.query.order_by(Station.station_name).all()
-    if request.method == 'POST':
-        src = request.form.get('source_station_id', type=int)
-        dst = request.form.get('destination_station_id', type=int)
-        journey_date_str = request.form.get('journey_date')
+    src_id = None
+    dst_id = None
+    journey_date_str = None
+    
+    if request.method == 'GET' and request.args.get('source_station_id'):
+        src_id = request.args.get('source_station_id', type=int)
+        dst_id = request.args.get('destination_station_id', type=int)
+        journey_date_str = request.args.get('journey_date')
         
         try:
             journey_date = datetime.strptime(journey_date_str, '%Y-%m-%d').date()
@@ -62,25 +82,62 @@ def search():
             flash('Invalid date selected.', 'warning')
             return redirect(url_for('user.search'))
 
-        src_routes = TrainRoute.query.filter_by(station_id=src).all()
+        src_routes = TrainRoute.query.filter_by(station_id=src_id).all()
         src_train_ids = {r.train_id: r.stop_number for r in src_routes}
 
-        dst_routes = TrainRoute.query.filter_by(station_id=dst).all()
+        dst_routes = TrainRoute.query.filter_by(station_id=dst_id).all()
         for r in dst_routes:
             if r.train_id in src_train_ids and src_train_ids[r.train_id] < r.stop_number:
                 train = Train.query.get(r.train_id)
                 status = TrainStatus.query.filter_by(train_id=train.train_id).first()
+                
+                # Calculate distance between src and dst
+                all_routes = TrainRoute.query.filter_by(train_id=train.train_id).order_by(TrainRoute.stop_number).all()
+                total_distance = 0.0
+                in_segment = False
+                prev_station = None
+                for route in all_routes:
+                    if route.station_id == src_id:
+                        in_segment = True
+                        prev_station = route.station
+                    elif in_segment:
+                        dist = route.distance_km
+                        if not dist:
+                            if prev_station and route.station:
+                                dist = haversine(
+                                    prev_station.latitude, prev_station.longitude,
+                                    route.station.latitude, route.station.longitude
+                                )
+                        total_distance += dist or 0.0
+                        prev_station = route.station
+                        if route.station_id == dst_id:
+                            break
+                            
+                # Fallback to 100 if distance is 0 or missing, else 1 INR per km
+                ticket_price = total_distance if total_distance > 0 else 100.0
+                ticket_price = round(ticket_price, 2)
+                
+                booked_seats = set()
+                for b in Booking.query.filter_by(
+                    train_id=train.train_id, journey_date=journey_date
+                ).filter(Booking.status != 'CANCELLED').all():
+                    if b.seat_number:
+                        booked_seats.update([s.strip() for s in b.seat_number.split(',')])
+                        
+                available_count = train.total_seats - len(booked_seats)
+
                 trains.append({
                     'train': train,
                     'status': status,
-                    'src_id': src,
-                    'dst_id': dst,
+                    'src_id': src_id,
+                    'dst_id': dst_id,
                     'journey_date': journey_date_str,
-                    'available_seats': train.total_seats - Booking.query.filter_by(
-                        train_id=train.train_id, journey_date=journey_date
-                    ).filter(Booking.status != 'CANCELLED').count()
+                    'available_seats': available_count,
+                    'booked_seats': booked_seats,
+                    'total_distance': total_distance,
+                    'ticket_price': ticket_price
                 })
-    return render_template('user/search.html', trains=trains, stations=stations)
+    return render_template('user/search.html', trains=trains, stations=stations, src_id=src_id, dst_id=dst_id, journey_date=journey_date_str)
 
 
 @user_bp.route('/book', methods=['POST'])
@@ -91,22 +148,58 @@ def book():
     src_id = request.form.get('source_station_id', type=int)
     dst_id = request.form.get('destination_station_id', type=int)
     journey_date_str = request.form.get('journey_date')
-    seat_pref = request.form.get('seat_preference', 'any')  # 'window' or 'any'
+    selected_seats_raw = request.form.get('selected_seats', '').strip()
     payment_method = request.form.get('payment_method', 'UPI')
-    amount = request.form.get('amount', type=float, default=500.0)
+    
+    # Calculate distance for pricing dynamically
+    all_routes = TrainRoute.query.filter_by(train_id=train_id).order_by(TrainRoute.stop_number).all()
+    total_distance = 0.0
+    in_segment = False
+    prev_station = None
+    for route in all_routes:
+        if route.station_id == src_id:
+            in_segment = True
+            prev_station = route.station
+        elif in_segment:
+            dist = route.distance_km
+            if not dist:
+                if prev_station and route.station:
+                    dist = haversine(
+                        prev_station.latitude, prev_station.longitude,
+                        route.station.latitude, route.station.longitude
+                    )
+            total_distance += dist or 0.0
+            prev_station = route.station
+            if route.station_id == dst_id:
+                break
+    amount = float(total_distance) if total_distance > 0 else 100.0
 
     journey_date = datetime.strptime(journey_date_str, '%Y-%m-%d').date()
 
-    if seat_pref == 'window':
-        # Window = A or F seats
-        all_window = [f"{r}{c}" for r in range(1, 10) for c in ['A', 'F']]
-        booked = {b.seat_number for b in Booking.query.filter_by(
-            train_id=train_id, journey_date=journey_date
-        ).filter(Booking.status != 'CANCELLED').all()}
-        available_window = [s for s in all_window if s not in booked]
-        seat = random.choice(available_window) if available_window else generate_seat(train_id, journey_date)
-    else:
+    booked = set()
+    for b in Booking.query.filter_by(
+        train_id=train_id, journey_date=journey_date
+    ).filter(Booking.status != 'CANCELLED').all():
+        if b.seat_number:
+            booked.update([s.strip() for s in b.seat_number.split(',')])
+
+    selected_seats = [s.strip() for s in selected_seats_raw.split(',') if s.strip()]
+    
+    # Verify availability
+    for s in selected_seats:
+        if s in booked:
+            flash(f'Sorry, seat {s} was just taken. Please try again.', 'danger')
+            return redirect(url_for('user.search'))
+            
+    if not selected_seats:
         seat = generate_seat(train_id, journey_date)
+        if not seat:
+            flash('No seats available.', 'danger')
+            return redirect(url_for('user.search'))
+        selected_seats = [seat]
+
+    final_seat_string = ", ".join(selected_seats)
+    total_amount = amount * len(selected_seats)
 
     from sqlalchemy.exc import IntegrityError
     for attempt in range(3):
@@ -117,8 +210,8 @@ def book():
                 source_station_id=src_id,
                 destination_station_id=dst_id,
                 journey_date=journey_date,
-                seat_number=seat,
-                status='CONFIRMED' if seat else 'WAITLISTED'
+                seat_number=final_seat_string,
+                status='CONFIRMED'
             )
             db.session.add(booking)
             db.session.flush()
@@ -127,7 +220,7 @@ def book():
             payment = Payment(
                 booking_id=booking.booking_id,
                 user_id=current_user.user_id,
-                amount=amount,
+                amount=total_amount,
                 payment_method=payment_method,
                 transaction_id=txn_id,
                 payment_status='PENDING'
@@ -235,6 +328,7 @@ def track_status_api(train_id):
     allocation = PlatformAllocation.query.filter_by(train_id=train_id).first()
     return jsonify({
         'train_id':       train_id,
+        'state':          status.state if status else 'stopped',
         'delay_minutes':  status.delay_minutes if status else 0,
         'current_station_id': status.current_station_id if status else None,
         'current_station_name': status.current_station.station_name if status else None,
@@ -265,9 +359,13 @@ def notifications():
 @user_required
 def seat_map(train_id, journey_date):
     train = Train.query.get_or_404(train_id)
-    booked = {b.seat_number for b in Booking.query.filter_by(
+    booked = set()
+    for b in Booking.query.filter_by(
         train_id=train_id, journey_date=journey_date
-    ).filter(Booking.status != 'CANCELLED').all()}
+    ).filter(Booking.status != 'CANCELLED').all():
+        if b.seat_number:
+            booked.update([s.strip() for s in b.seat_number.split(',')])
+            
     rows = range(1, 10)
     cols = ['A', 'B', 'C', 'D', 'E', 'F']
     return render_template('user/seat_map.html', train=train, booked=booked,

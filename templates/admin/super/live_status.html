@@ -468,111 +468,8 @@
 
 </div>
 
-<!-- ── Schedule Train Modal ─────────────────────────────────────── -->
-<div id="sched-modal" style="
-  display:none; position:fixed; inset:0; z-index:9000;
-  background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
-  align-items:center; justify-content:center;
-  opacity:0; transition:opacity .25s;
-" onclick="if(event.target===this)closeScheduleModal()">
-  <div style="
-    background:var(--bg2); border:1px solid var(--border2);
-    border-radius:16px; padding:28px 28px 22px; width:360px; max-width:95vw;
-    box-shadow:0 24px 64px rgba(0,0,0,0.5);
-    transform:translateY(20px); transition:transform .25s;
-  " id="sched-modal-inner">
-    <div style="font-size:17px;font-weight:800;margin-bottom:4px">&#x23F1; Schedule Journey</div>
-    <div id="sched-train-label" style="font-size:12px;color:var(--muted);margin-bottom:20px">—</div>
 
-    <!-- Route display -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;
-                background:var(--bg3);border-radius:10px;padding:10px 14px">
-      <div style="font-size:11px;text-align:center">
-        <div style="font-weight:700;color:var(--green)" id="sched-source-label">Source</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">Source</div>
-      </div>
-      <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:2px"></div>
-      <div style="font-size:11px;text-align:center">
-        <div style="font-weight:700;color:var(--accent)" id="sched-dest-label">Dest</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">Destination</div>
-      </div>
-    </div>
 
-    <!-- Direction toggle -->
-    <div style="margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">
-        Direction
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="sched-dir-btn" data-dir="forward"
-          onclick="document.querySelectorAll('.sched-dir-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
-          style="flex:1;padding:8px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
-                 border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:.15s">
-          &#x25B6; Forward<br>
-          <span style="font-size:9px;font-weight:400;opacity:.7">Source &#x2192; Dest</span>
-        </button>
-        <button class="sched-dir-btn" data-dir="reverse"
-          onclick="document.querySelectorAll('.sched-dir-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')"
-          style="flex:1;padding:8px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;
-                 border:1px solid var(--border2);background:var(--bg3);color:var(--muted);transition:.15s">
-          &#x25C0; Return<br>
-          <span style="font-size:9px;font-weight:400;opacity:.7">Dest &#x2192; Source</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Datetime picker -->
-    <div style="margin-bottom:20px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">
-        Departure Date &amp; Time
-      </div>
-      <input type="datetime-local" id="sched-datetime"
-        style="width:100%;box-sizing:border-box;color-scheme:dark">
-      <div style="font-size:10px;color:var(--muted);margin-top:4px">
-        Set when the train departs from its origin in the chosen direction.
-      </div>
-    </div>
-
-    <!-- Actions -->
-    <div style="display:flex;align-items:center;gap:10px">
-      <button id="sched-save-btn" onclick="saveSchedule()"
-        class="btn btn-primary" style="flex:1">
-        &#x1F4BE; Save Schedule
-      </button>
-      <button onclick="closeScheduleModal()" class="btn btn-ghost">Cancel</button>
-    </div>
-    <div id="sched-save-msg" style="font-size:12px;margin-top:8px;min-height:16px;text-align:center"></div>
-  </div>
-</div>
-
-<style>
-/* Schedule modal visible state */
-#sched-modal.visible            { opacity:1; }
-#sched-modal.visible #sched-modal-inner { transform:translateY(0); }
-
-/* Direction button active */
-.sched-dir-btn.active {
-  background: rgba(108,99,255,0.15) !important;
-  border-color: var(--accent) !important;
-  color: var(--accent) !important;
-}
-
-/* datetime-local dark style */
-input[type="datetime-local"] {
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text);
-  font-family: inherit;
-}
-input[type="datetime-local"]:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(108,99,255,0.2);
-}
-</style>
 
 
 <!-- Leaflet JS -->
@@ -584,20 +481,11 @@ input[type="datetime-local"]:focus {
 // ================================================================
 
 var map, trainData = [], stationData = [], selectedTrainId = null;
-var trainLayers   = {};   // trainId → { bgLine, glowLine, marker:null }
+var trainLayers    = {};   // trainId → { line }
 var stationMarkers = [];
-var animFrames    = {};   // trainId → requestAnimationFrame handle
-var trainProgress = {};   // trainId → 0..1 fraction along route
-var trainPhase    = {};   // trainId → 'forward'|'waiting_dest'|'reverse'|'waiting_source'
-var trainWaitMs   = {};   // trainId → remaining wait in ms
-const ANIM_SPEED = 0.00004; // fraction of route per ms
 
 
-// ── Zoom-glitch guard ───────────────────────────────────────────
-// During Leaflet zoom, the SVG pane is scaled via CSS transform.
-// Simultaneously calling setLatLngs() causes a 1-frame positional
-// conflict. We freeze all polyline updates during that window.
-var isZooming = false;
+
 
 // ── Clock ───────────────────────────────────────────────────────
 function updateClock() {
@@ -737,26 +625,7 @@ function renderIndiaMap(geojson) {
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-map.on('zoomstart', function() {
-  isZooming = true;
-  // Instantly hide glow trails so they don't smear during zoom CSS transform
-  Object.values(trainLayers).forEach(function(layers) {
-    if (layers.glowLine) layers.glowLine.setStyle({ opacity: 0 });
-  });
-});
 
-map.on('zoomend', function() {
-  isZooming = false;
-  // Restore glow trail opacity per-train (respecting current filter state)
-  Object.entries(trainLayers).forEach(function([tid, layers]) {
-    if (!layers.glowLine) return;
-    // If a specific train is filtered, only restore visible ones
-    const chip = document.querySelector('.ls-chip.active');
-    const activeId = chip ? chip.dataset.id : 'all';
-    const visible = activeId === 'all' || String(tid) === String(activeId);
-    layers.glowLine.setStyle({ opacity: visible ? 0.9 : 0 });
-  });
-});
 
 // ── Fetch API data with timeout ───────────────────────────────────
 const _apiCtrl = new AbortController();
@@ -890,254 +759,29 @@ function renderStationMarkers() {
 
 
 
-//
-// Each train has TWO layers:
-//   1. bgLine  — dashed route polyline (always visible, dimmed)
-//   2. glowLine — animated glow trail that travels forward then reverses
-//
-// No train icon/marker. Direction-only line animation.
-//
-// State machine per train:
-//   phase: 'forward'        → progress 0→1, glow trail advances
-//          'waiting_dest'   → paused at destination, countdown
-//          'reverse'        → progress 1→0, glow trail retreats
-//          'waiting_source' → paused at source, countdown
-//   then repeats.
-
-// ── State stores ─────────────────────────────────────────────────
-var trainPhase    = {};   // train_id → phase string
-var trainWaitMs   = {};   // train_id → remaining wait milliseconds
-var lastTs        = {};   // train_id → last animation timestamp
-
-// Interpolate a position along a polyline by fraction t ∈ [0,1]
-function lerpAlongRoute(stops, t) {
-  if (!stops.length) return null;
-  if (t <= 0) return { lat: stops[0].lat, lon: stops[0].lon };
-  if (t >= 1) return { lat: stops[stops.length-1].lat, lon: stops[stops.length-1].lon };
-
-  const segs = [];
-  let total = 0;
-  for (let i = 0; i < stops.length - 1; i++) {
-    const d = haversine(stops[i].lat, stops[i].lon, stops[i+1].lat, stops[i+1].lon);
-    segs.push(d);
-    total += d;
-  }
-
-  let dist = t * total;
-  for (let i = 0; i < segs.length; i++) {
-    if (dist <= segs[i]) {
-      const st = dist / segs[i];
-      return {
-        lat: stops[i].lat   + st * (stops[i+1].lat   - stops[i].lat),
-        lon: stops[i].lon   + st * (stops[i+1].lon   - stops[i].lon),
-      };
-    }
-    dist -= segs[i];
-  }
-  return { lat: stops[stops.length-1].lat, lon: stops[stops.length-1].lon };
-}
-
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371, toRad = d => d * Math.PI / 180;
-  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-// Compute wait duration in ms from turnaround_minutes + anim_speed_scale
-// anim_speed_scale = animation-seconds per real-hour of wait
-function calcWaitMs(train) {
-  const hrs   = (train.turnaround_minutes || 360) / 60;   // real hours
-  const scale = train.anim_speed_scale   || 8.0;           // anim-sec per real-hour
-  return hrs * scale * 1000;                                // → milliseconds
-}
-
-// ── Time-based position init ──────────────────────────────────────
-// If a journey_start_datetime is set, calculate exact position from elapsed time.
-// Otherwise fall back to random cosmetic animation.
-function initProgress(train) {
-  if (!train.stops || !train.stops.length) return 0;
-
-  const dir = train.journey_direction || 'idle';
-  const startIso = train.journey_start_datetime;
-
-  if (startIso && dir !== 'idle' && (train.total_route_minutes || 0) > 0) {
-    const startMs  = new Date(startIso).getTime();
-    const nowMs    = Date.now();
-    const elapsedMs = nowMs - startMs;
-    const totalMs  = train.total_route_minutes * 60 * 1000;
-
-    // Clamp 0..1
-    let t = Math.max(0, Math.min(1, elapsedMs / totalMs));
-    if (dir === 'reverse') t = Math.max(0, Math.min(1, 1 - t));
-    return t;
-  }
-
-  // Fallback: cosmetic random-ish start
-  let idx = train.stops.findIndex(s => s.station_id === train.current_station_id);
-  if (idx < 0) idx = 0;
-  const base = idx / Math.max(train.stops.length - 1, 1);
-  const step = 1  / Math.max(train.stops.length - 1, 1);
-  return Math.min(1, base + step * (0.3 + Math.random() * 0.4));
-}
-
-// ── Phase init from direction ─────────────────────────────────────
-function initPhase(train) {
-  const dir = train.journey_direction || 'idle';
-  if (dir === 'reverse') return 'reverse';
-  if (dir === 'idle')    return 'forward'; // still animate cosmetically
-  return 'forward';
-}
-
-
+// ── Render static route lines (one solid polyline per train) ──────
 function renderTrainLayers() {
-  injectSvgGlowFilter();
-
   trainData.forEach(train => {
     if (!train.stops || train.stops.length < 2) return;
     const latlngs = train.stops.map(s => [s.lat, s.lon]);
     const color   = train.color;
 
-    // 1. Background route — dashed, dimmed
-    const bgLine = L.polyline(latlngs, {
-      color, weight: 3, opacity: 0.25,
-      dashArray: '8 6', lineCap: 'round', lineJoin: 'round',
+    const line = L.polyline(latlngs, {
+      color,
+      weight:    4,
+      opacity:   0.85,
+      lineCap:   'round',
+      lineJoin:  'round',
     }).addTo(map);
 
-    // 2. Glow trail — solid, bright, animated
-    const glowLine = L.polyline([], {
-      color, weight: 4, opacity: 0.9,
-      lineCap: 'round', lineJoin: 'round',
-      className: 'glow-line',
-    }).addTo(map);
-
-    glowLine.on('add', function() {
-      const path = glowLine.getElement();
-      if (path) path.style.filter = `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px ${color}66)`;
+    // Subtle glow via CSS filter
+    line.on('add', function() {
+      const el = line.getElement();
+      if (el) el.style.filter = `drop-shadow(0 0 4px ${color}99)`;
     });
 
-    // Initialise state
-    const initProg  = initProgress(train);
-    const initPh    = initPhase(train);
-    trainProgress[train.train_id] = initProg;
-    trainPhase[train.train_id]    = initPh;
-    trainWaitMs[train.train_id]   = 0;
-
-    // No marker — lines only
-    trainLayers[train.train_id] = { bgLine, glowLine, marker: null };
-
-    startAnimation(train);
+    trainLayers[train.train_id] = { line };
   });
-}
-
-// ── Per-train animation loop ──────────────────────────────────────
-function startAnimation(train) {
-  if (!trainLayers[train.train_id]) return;
-  lastTs[train.train_id] = null;
-
-  const TRAIL_LEN = 0.28;   // glow trail = 28% of route length
-
-  function tick(ts) {
-    if (!lastTs[train.train_id]) lastTs[train.train_id] = ts;
-    const dtMs = ts - lastTs[train.train_id];
-    lastTs[train.train_id] = ts;
-
-    const layers = trainLayers[train.train_id];
-    if (!layers) return;
-
-    let t     = trainProgress[train.train_id];
-    let phase = trainPhase[train.train_id];
-
-    // ── State machine ───────────────────────────────────────────
-    if (phase === 'forward') {
-      t += ANIM_SPEED * dtMs;
-      if (t >= 1) {
-        t = 1;
-        trainPhase[train.train_id]  = 'waiting_dest';
-        trainWaitMs[train.train_id] = calcWaitMs(train);
-      }
-
-    } else if (phase === 'waiting_dest') {
-      trainWaitMs[train.train_id] -= dtMs;
-      if (trainWaitMs[train.train_id] <= 0) {
-        trainPhase[train.train_id]  = 'reverse';
-        trainWaitMs[train.train_id] = 0;
-      }
-
-    } else if (phase === 'reverse') {
-      t -= ANIM_SPEED * dtMs;
-      if (t <= 0) {
-        t = 0;
-        trainPhase[train.train_id]  = 'waiting_source';
-        trainWaitMs[train.train_id] = calcWaitMs(train);
-      }
-
-    } else if (phase === 'waiting_source') {
-      trainWaitMs[train.train_id] -= dtMs;
-      if (trainWaitMs[train.train_id] <= 0) {
-        trainPhase[train.train_id]  = 'forward';
-        trainWaitMs[train.train_id] = 0;
-        t = 0;
-      }
-    }
-
-    trainProgress[train.train_id] = t;
-
-    // ── DOM updates (skip during zoom) ──────────────────────────
-    if (!isZooming) {
-      let trailStart, trailEnd;
-
-      if (phase === 'forward' || phase === 'waiting_dest') {
-        // Trail advances forward: from (t - TRAIL_LEN) to t
-        trailStart = Math.max(0, t - TRAIL_LEN);
-        trailEnd   = t;
-      } else {
-        // Trail retreats: from t to (t + TRAIL_LEN)
-        trailStart = t;
-        trailEnd   = Math.min(1, t + TRAIL_LEN);
-      }
-
-      // Build trail points
-      const trailPoints = [];
-      const steps = 40;
-      for (let i = 0; i <= steps; i++) {
-        const frac = trailStart + (trailEnd - trailStart) * (i / steps);
-        const p = lerpAlongRoute(train.stops, frac);
-        if (p) trailPoints.push([p.lat, p.lon]);
-      }
-      layers.glowLine.setLatLngs(trailPoints);
-
-      // Pulse (dim glow trail) when waiting at a terminal
-      if (phase === 'waiting_dest' || phase === 'waiting_source') {
-        const pulse = 0.4 + 0.5 * Math.abs(Math.sin(ts / 600));
-        const el = layers.glowLine.getElement();
-        if (el) el.style.opacity = String(pulse);
-      } else {
-        const el = layers.glowLine.getElement();
-        if (el) el.style.opacity = '0.9';
-      }
-    }
-
-    animFrames[train.train_id] = requestAnimationFrame(tick);
-  }  // end tick
-  animFrames[train.train_id] = requestAnimationFrame(tick);
-}  // end startAnimation
-
-// ── SVG Glow filter (injected once) ─────────────────────────────
-
-function injectSvgGlowFilter() {
-  if (document.getElementById('rs-svg-defs')) return;
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('id', 'rs-svg-defs');
-  svg.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden');
-  svg.innerHTML = `<defs>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>`;
-  document.body.appendChild(svg);
 }
 
 // ── Panel rendering ──────────────────────────────────────────────
@@ -1206,16 +850,6 @@ function buildPanel() {
           <span class="ls-status-val">${escHtml(lastStop.name)}</span>
         </div>
         <div class="ls-status-row">${delayBadge}</div>
-        <div class="ls-status-row" style="margin-top:4px">
-          ${buildDirectionBadge(train)}
-          <button onclick="openScheduleModal(${train.train_id}, event)"
-            style="margin-left:auto;padding:3px 10px;font-size:10px;font-weight:700;
-                   border:1px solid ${train.color}66;border-radius:20px;background:${train.color}18;
-                   color:${train.color};cursor:pointer;letter-spacing:.4px;white-space:nowrap"
-            id="schbtn-${train.train_id}">
-            &#x23F1; Schedule
-          </button>
-        </div>
       </div>
       <div class="ls-stops-timeline">
         <div class="ls-route-summary">
@@ -1240,125 +874,6 @@ function buildPanel() {
   buildFilterChips();
 }
 
-// \u2500\u2500 Direction badge \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function buildDirectionBadge(train) {
-  const dir = train.journey_direction || 'idle';
-  const startStr = train.journey_start_datetime;
-  const colors = { forward: '#22c55e', reverse: '#4d96ff', idle: '#888' };
-  const icons  = { forward: '&#x25B6;', reverse: '&#x25C0;', idle: '&#x23F8;' };
-  const labels = { forward: 'Forward', reverse: 'Returning', idle: 'Idle' };
-  const c = colors[dir] || '#888';
-  let dateLabel = '';
-  if (startStr && dir !== 'idle') {
-    const d = new Date(startStr);
-    dateLabel = ' · ' + d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})
-      + ' ' + d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false});
-  }
-  return `<span style="display:inline-flex;align-items:center;gap:4px;
-    background:${c}18;border:1px solid ${c}44;border-radius:20px;
-    padding:2px 8px;font-size:10px;font-weight:700;color:${c}">
-    ${icons[dir]} ${labels[dir]}${dateLabel}
-  </span>`;
-}
-
-// \u2500\u2500 Schedule Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var _schedModalTrainId = null;
-
-function openScheduleModal(trainId, evt) {
-  if (evt) evt.stopPropagation();    // don't trigger card click/select
-  _schedModalTrainId = trainId;
-  const train = trainData.find(t => t.train_id === trainId);
-  if (!train) return;
-
-  // Pre-fill current values
-  const modal = document.getElementById('sched-modal');
-  document.getElementById('sched-train-label').textContent =
-    train.train_name + ' (' + train.train_number + ')';
-
-  const firstStop = train.stops[0];
-  const lastStop  = train.stops[train.stops.length - 1];
-  document.getElementById('sched-source-label').textContent = firstStop ? firstStop.name : '—';
-  document.getElementById('sched-dest-label').textContent   = lastStop  ? lastStop.name  : '—';
-
-  // Default datetime = now
-  const now = new Date();
-  now.setSeconds(0, 0);
-  const localIso = new Date(now.getTime() - now.getTimezoneOffset()*60000)
-    .toISOString().slice(0,16);
-  const inp = document.getElementById('sched-datetime');
-  inp.value = train.journey_start_datetime
-    ? train.journey_start_datetime.slice(0,16)
-    : localIso;
-
-  // Default direction
-  const dir = train.journey_direction || 'forward';
-  document.querySelectorAll('.sched-dir-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.dir === dir);
-  });
-
-  modal.style.display = 'flex';
-  setTimeout(() => modal.classList.add('visible'), 10);
-}
-
-function closeScheduleModal() {
-  const modal = document.getElementById('sched-modal');
-  modal.classList.remove('visible');
-  setTimeout(() => { modal.style.display = 'none'; }, 250);
-}
-
-function saveSchedule() {
-  const trainId = _schedModalTrainId;
-  const train   = trainData.find(t => t.train_id === trainId);
-  if (!train) return;
-
-  const dtVal = document.getElementById('sched-datetime').value;
-  const dir   = document.querySelector('.sched-dir-btn.active')?.dataset.dir || 'forward';
-  const btn   = document.getElementById('sched-save-btn');
-  const msg   = document.getElementById('sched-save-msg');
-
-  btn.disabled = true;
-  msg.textContent = '';
-
-  fetch(`/admin/super/trains/${trainId}/schedule`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ start_datetime: dtVal, direction: dir })
-  })
-  .then(r => r.json())
-  .then(data => {
-    btn.disabled = false;
-    if (data.ok) {
-      // Update in-memory trainData so badge re-renders correctly
-      train.journey_start_datetime = data.journey_start_datetime;
-      train.journey_direction      = data.journey_direction;
-
-      // Re-init this train's animation
-      if (animFrames[trainId]) {
-        cancelAnimationFrame(animFrames[trainId]);
-        delete animFrames[trainId];
-      }
-      const initProg = initProgress(train);
-      trainProgress[trainId] = initProg;
-      trainPhase[trainId]    = initPhase(train);
-      trainWaitMs[trainId]   = 0;
-      startAnimation(train);
-
-      msg.textContent  = '\u2713 Scheduled!';
-      msg.style.color  = 'var(--green)';
-      // Refresh card direction badge
-      buildPanel();
-      setTimeout(closeScheduleModal, 1200);
-    } else {
-      msg.textContent = '\u2717 ' + (data.error || 'Error');
-      msg.style.color = 'var(--danger)';
-    }
-  })
-  .catch(() => {
-    btn.disabled = false;
-    msg.textContent = '\u2717 Network error';
-    msg.style.color = 'var(--danger)';
-  });
-}
 
 function buildFilterChips() {
   const row = document.getElementById('ls-filter-row');
@@ -1442,11 +957,10 @@ function filterTrain(id, chipEl) {
     }
   }
 
-  // Show/hide train layers (no marker — lines only)
+  // Show/hide static route lines
   Object.entries(trainLayers).forEach(([tid, layers]) => {
     const visible = (id === 'all') || (String(tid) === String(id));
-    layers.bgLine.setStyle({ opacity: visible ? 0.25 : 0.03 });
-    layers.glowLine.setStyle({ opacity: visible ? 0.9 : 0.0 });
+    layers.line.setStyle({ opacity: visible ? 0.85 : 0.06 });
   });
 }
 

@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Train Drivers | RailSync{% endblock %}
+{% block page_title %}Train Drivers{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="card-title">Registered Train Drivers</div>
+    <div>
+      <input type="text" id="driver-search" placeholder="Search by name or email..." style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; width: 250px; background: var(--bg); color: var(--text);">
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Driver Name</th>
+          <th>Email</th>
+          <th>Assigned Train</th>
+          <th>Train Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for driver in drivers %}
+        <tr>
+          <td><span class="mono">#{{ driver.driver_id }}</span></td>
+          <td style="font-weight:600">{{ driver.name }}</td>
+          <td style="color:var(--muted)">{{ driver.email }}</td>
+          <td>
+            {% if driver.train %}
+              <div style="font-weight:600">{{ driver.train.train_number }}</div>
+              <div style="font-size:11px;color:var(--muted)">{{ driver.train.train_name }}</div>
+            {% else %}
+              <span class="badge badge-amber">Unassigned</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if driver.train and driver.train.statuses %}
+              {% set status = driver.train.statuses[0] %}
+              {% if status.state == 'en_route' %}
+                <span class="badge badge-green"><i class="fa-solid fa-train" style="margin-right:4px;"></i> En Route</span>
+              {% else %}
+                <span class="badge badge-purple"><i class="fa-solid fa-pause" style="margin-right:4px;"></i> Stopped</span>
+              {% endif %}
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+                {% if status.current_station %}
+                  At/From: {{ status.current_station.station_name }}
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="badge badge-amber">Idle / No Status</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">
+            No train drivers registered yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+  document.getElementById('driver-search').addEventListener('keyup', function() {
+    var query = this.value.toLowerCase();
+    var rows = document.querySelectorAll('tbody tr');
+    rows.forEach(function(row) {
+      if (row.children.length === 1) return; // Skip "No drivers" row
+      var name = row.children[1].textContent.toLowerCase();
+      var email = row.children[2].textContent.toLowerCase();
+      if (name.indexOf(query) !== -1 || email.indexOf(query) !== -1) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  });
+</script>
+{% endblock %}

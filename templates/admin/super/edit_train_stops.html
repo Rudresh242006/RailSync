@@ -99,7 +99,12 @@
       </div>
     </div>
     <div style="display:flex;gap:8px">
-      <button type="button" onclick="addStop()" class="btn btn-ghost btn-sm">+ Add Stop</button>
+      {% if is_locked %}
+        <span class="badge" style="background:var(--amber); color:#000; padding:6px 12px; border-radius:12px; font-weight:600; font-size:12px; align-self:center;">🔒 Journey Started - Locked</span>
+      {% else %}
+        <button type="button" onclick="recalculateAllTimes()" class="btn btn-ghost btn-sm" title="Recalculate all arrival/departure times using current speed formula">🔄 Recalculate</button>
+        <button type="button" onclick="addStop()" class="btn btn-ghost btn-sm">+ Add Stop</button>
+      {% endif %}
       <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost btn-sm">&#8592; Back</a>
     </div>
   </div>
@@ -115,74 +120,113 @@
   <form method="POST" id="edit-stops-form" onsubmit="return validateAndSave()">
     <div id="stops-container"></div>
     <div style="display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      {% if not is_locked %}
       <button type="submit" class="btn btn-primary">&#128190; Save Route &#8594;</button>
+      {% endif %}
       <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
 </div>
 
-<!-- Turnaround Settings Card -->
+<!-- ── Journey Schedule Card ──────────────────────────────────────────── -->
 <div class="card" style="max-width:940px;margin-top:20px">
-  <div class="card-header" style="margin-bottom:16px">
+  <div class="card-header" style="margin-bottom:20px">
     <div>
-      <div class="card-title">🔁 Return Journey Settings</div>
+      <div class="card-title">🗓️ Journey Schedule</div>
       <div style="font-size:12px;color:var(--muted);margin-top:3px">
-        Configure turnaround time at each terminal and animation display speed.
+        Set when this train first departs and how long it rests at the destination before returning. The A → B → A loop repeats automatically.
       </div>
+    </div>
+    <!-- Loop enabled toggle -->
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+      <span style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px">Loop Active</span>
+      <label class="cs-toggle">
+        <input type="checkbox" id="cs-enabled" {% if train.cycle_enabled %}checked{% endif %} {% if is_locked %}disabled{% endif %}>
+        <span class="cs-slider"></span>
+      </label>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:end">
-    <!-- Turnaround Time -->
-    <div>
-      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:8px">
-        Turnaround Time at Each Terminal
-      </label>
-      <div style="display:flex;gap:10px;align-items:center">
-        <div style="flex:1">
-          <input type="number" id="ta-hours" min="0" max="48" placeholder="6"
-                 value="{{ (train.turnaround_minutes // 60) if train.turnaround_minutes else 6 }}"
-                 style="text-align:center">
-          <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">HOURS</div>
-        </div>
-        <div style="flex:1">
-          <input type="number" id="ta-mins" min="0" max="59" placeholder="0"
-                 value="{{ (train.turnaround_minutes % 60) if train.turnaround_minutes else 0 }}"
-                 style="text-align:center">
-          <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">MINUTES</div>
+
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:start">
+
+    <!-- Left: inputs -->
+    <div style="display:flex;flex-direction:column;gap:18px">
+
+      <!-- Service Start Date/Time -->
+      <div>
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:8px">
+          Service Start Date &amp; Time
+        </label>
+        <input type="datetime-local" id="cs-start"
+               value="{{ train.service_start_date.strftime('%Y-%m-%dT%H:%M') if train.service_start_date else '' }}"
+               style="width:100%" onchange="updateLivePreview()" {% if is_locked %}disabled{% endif %}>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">
+          When the train first departs from its <strong>origin</strong> station.
         </div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">
-        Train waits this long at source &amp; destination before reversing.
+
+      <!-- Return Wait -->
+      <div>
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:8px">
+          Wait at Destination Before Returning
+        </label>
+        <div style="display:flex;gap:12px">
+          <div style="flex:1">
+            <input type="number" id="cs-wait-days" min="0" max="30" placeholder="0"
+                   value="{{ train.return_wait_days if train.return_wait_days is not none else 0 }}"
+                   style="text-align:center" onwheel="this.blur()" oninput="updateLivePreview()" {% if is_locked %}disabled{% endif %}>
+            <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">DAYS</div>
+          </div>
+          <div style="flex:1">
+            <input type="number" id="cs-wait-hours" min="0" max="23" placeholder="6"
+                   value="{{ train.return_wait_hours if train.return_wait_hours is not none else 0 }}"
+                   style="text-align:center" onwheel="this.blur()" oninput="updateLivePreview()" {% if is_locked %}disabled{% endif %}>
+            <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">HOURS</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">
+          After reaching the destination the train rests this long before the return trip.
+        </div>
       </div>
+
     </div>
-    <!-- Animation Scale -->
+
+    <!-- Right: timeline preview -->
     <div>
-      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:8px">
-        Animation Wait Scale
-      </label>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="number" id="ta-scale" min="0.5" max="60" step="0.5" placeholder="8"
-               value="{{ train.anim_speed_scale if train.anim_speed_scale else 8.0 }}"
-               style="flex:1;text-align:center">
-        <span style="font-size:12px;color:var(--muted);white-space:nowrap">sec / hr</span>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px">
+        Trip Timeline Preview
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">
-        How many animation-seconds = 1 real hour of turnaround wait.
-        (e.g. 8 = 6hr wait shows as ~48 sec pause on live map)
+      <div id="cs-preview" style="font-size:12px;color:var(--muted);font-style:italic">
+        Set a start date to see the upcoming trip schedule.
       </div>
     </div>
+
   </div>
-  <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center">
-    <button type="button" onclick="saveTurnaround()" class="btn btn-primary" id="ta-save-btn">
-      &#128190; Save Return Settings
+
+    <style>
+    .cs-toggle { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+    .cs-toggle input { opacity:0; width:0; height:0; }
+    .cs-slider { position:absolute; inset:0; cursor:pointer; background:var(--border2); border-radius:24px; transition:.3s; }
+    .cs-slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:white; border-radius:50%; transition:.3s; }
+    .cs-toggle input:checked + .cs-slider { background:var(--accent); }
+    .cs-toggle input:checked + .cs-slider:before { transform:translateX(20px); }
+  </style>
+
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center">
+    {% if not is_locked %}
+    <button type="button" onclick="saveCycleSchedule()" class="btn btn-primary" id="cs-save-btn">
+      &#128190; Save Schedule
     </button>
-    <span id="ta-save-msg" style="font-size:12px;color:var(--green);display:none">✓ Saved!</span>
+    {% endif %}
+    <span id="cs-save-msg" style="font-size:12px;display:none"></span>
   </div>
 </div>
 
 <script>
+
 var stations      = JSON.parse(document.getElementById('stations-data').textContent);
 var existingStops = JSON.parse(document.getElementById('existing-stops-data').textContent);
+
 
 var stationMap = {};
 for (var i = 0; i < stations.length; i++) {
@@ -190,6 +234,7 @@ for (var i = 0; i < stations.length; i++) {
 }
 
 var stopCount = 0;
+var isLocked = {{ 'true' if is_locked else 'false' }};
 
 // Cache: "fromSid_toSid" → travel minutes (persists for entire page session)
 var _travelCache = {};
@@ -206,7 +251,8 @@ function buildOptions(preselectedId) {
 }
 
 // ── Add a stop row ───────────────────────────────────────────────────
-function addStop(preselectedId, preArrival, preDeparture) {
+// preWaitMin: optional wait-time in minutes (used when arrival is not provided)
+function addStop(preselectedId, preArrival, preDeparture, preWaitMin) {
   stopCount++;
   var idx     = stopCount;
   var isFirst = (document.querySelectorAll('#stops-container .stop-row').length === 0);
@@ -216,9 +262,15 @@ function addStop(preselectedId, preArrival, preDeparture) {
   if (preArrival && preDeparture) {
     var aP = preArrival.split(':'), dP = preDeparture.split(':');
     var diff = (parseInt(dP[0])*60 + parseInt(dP[1])) - (parseInt(aP[0])*60 + parseInt(aP[1]));
-    if (diff < 0) diff += 24 * 60; // Handle midnight crossing
+    if (diff < 0) diff += 24 * 60;
     if (diff > 0) { preWaitH = String(Math.floor(diff/60)); preWaitM = String(diff % 60); }
+  } else if (preWaitMin) {
+    // Arrival not provided but wait time preserved from DB
+    preWaitH = String(Math.floor(preWaitMin / 60));
+    preWaitM = String(preWaitMin % 60);
   }
+
+  var dis = isLocked ? ' disabled' : '';
 
   var div = document.createElement('div');
   div.className  = 'stop-row';
@@ -231,7 +283,7 @@ function addStop(preselectedId, preArrival, preDeparture) {
 
       // Station
       '<div class="form-group" style="margin-bottom:0">' +
-        '<select name="stop_station_id" required onchange="onStopChange(this,' + idx + ')">' +
+        '<select name="stop_station_id" required onchange="onStopChange(this,' + idx + ')"' + dis + '>' +
           buildOptions(preselectedId) +
         '</select>' +
         '<div class="validation-msg" id="vmsg-' + idx + '"></div>' +
@@ -240,7 +292,7 @@ function addStop(preselectedId, preArrival, preDeparture) {
       // Arrival
       '<div class="form-group" style="margin-bottom:0">' +
         '<input type="time" name="arrival_time" id="arr-' + idx + '" value="' + (preArrival || '') + '"' +
-          (isFirst ? '' : ' readonly') +
+          (isFirst && !isLocked ? '' : ' readonly') +
           ' onchange="onArrivalChange(' + idx + ')">' +
         '<div style="font-size:9px;color:var(--muted);margin-top:3px" id="arr-label-' + idx + '">' +
           (isFirst ? 'Set manually' : 'Auto-calculated') +
@@ -252,12 +304,12 @@ function addStop(preselectedId, preArrival, preDeparture) {
         '<div class="wait-row">' +
           '<div>' +
             '<input type="number" id="wait-h-' + idx + '" min="0" max="23" placeholder="0" value="' + preWaitH + '"' +
-              ' oninput="onWaitChange(' + idx + ')">' +
+              ' oninput="onWaitChange(' + idx + ')" onwheel="this.blur()"' + dis + '>' +
             '<div class="wait-label">HRS</div>' +
           '</div>' +
           '<div>' +
             '<input type="number" id="wait-m-' + idx + '" min="0" max="59" placeholder="0" value="' + preWaitM + '"' +
-              ' oninput="onWaitChange(' + idx + ')">' +
+              ' oninput="onWaitChange(' + idx + ')" onwheel="this.blur()"' + dis + '>' +
             '<div class="wait-label">MIN</div>' +
           '</div>' +
         '</div>' +
@@ -270,15 +322,16 @@ function addStop(preselectedId, preArrival, preDeparture) {
       '</div>' +
 
       // Remove
-      '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm"' +
-        ' style="margin-bottom:0" title="Remove">&#x2715;</button>' +
+      (isLocked ? '' : '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm"' +
+        ' style="margin-bottom:0" title="Remove">&#x2715;</button>') +
 
     '</div>';
 
   document.getElementById('stops-container').appendChild(div);
   document.getElementById('col-headers').style.display = 'grid';
 
-  if (preselectedId) onStopChange(div.querySelector('select'), idx);
+  // Pass skipCalc=true when pre-existing arrival is provided so we don't re-fetch distances on page load
+  if (preselectedId) onStopChange(div.querySelector('select'), idx, !!preArrival);
   if (preArrival && (preWaitH || preWaitM)) onWaitChange(idx);
 
   updateCounter();
@@ -321,6 +374,7 @@ function onWaitChange(idx) {
   dep.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
 
   cascadeFrom(idx);  // update all subsequent stops
+  updateLivePreview(); // update the timeline preview with new durations
 }
 
 // ── Manual arrival change (first stop only) ──────────────────────────
@@ -353,8 +407,9 @@ function cascadeFrom(fromIdx) {
     var key = pSid + '_' + cSid;
     if (_travelCache[key] !== undefined) {
       // Instant: use cached travel minutes
+      var travelMin = _travelCache[key].min;  // cache is {min, km}
       var p2  = prevDep.value.split(':');
-      var tot = parseInt(p2[0])*60 + parseInt(p2[1]) + _travelCache[key];
+      var tot = parseInt(p2[0])*60 + parseInt(p2[1]) + travelMin;
       currArr.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
       onWaitChange(cIdx);   // recalculate this stop's departure & continue cascade
     } else {
@@ -379,7 +434,8 @@ function fetchTravelTime(fromId, toId, depTime, targetIdx) {
     .then(function(data) {
       if (row) row.classList.remove('calculating');
       if (data.estimated_minutes && !data.error) {
-        _travelCache[fromId + '_' + toId] = data.estimated_minutes;
+        // Store {min, km} so both cascadeFrom and enrichDisplayInfo can use it
+        _travelCache[fromId + '_' + toId] = { min: data.estimated_minutes, km: data.distance_km };
 
         var p   = depTime.split(':');
         var tot = parseInt(p[0])*60 + parseInt(p[1]) + data.estimated_minutes;
@@ -387,11 +443,11 @@ function fetchTravelTime(fromId, toId, depTime, targetIdx) {
 
         if (msg) {
           var st = stationMap[toId];
-          msg.textContent = '✓ ' + (st ? st.station_name : '') +
-            ' · ' + data.distance_km + ' km · ~' + data.estimated_minutes + ' min travel';
+          msg.textContent = '\u2713 ' + (st ? st.station_name : '') +
+            ' \u00b7 ' + data.distance_km + ' km \u00b7 ~' + data.estimated_minutes + ' min travel';
           msg.className = 'validation-msg ok';
         }
-        onWaitChange(targetIdx);   // recalculate departure → triggers cascade
+        onWaitChange(targetIdx);   // recalculate departure \u2192 triggers cascade
       } else {
         if (msg) msg.className = 'validation-msg warn';
       }
@@ -402,7 +458,8 @@ function fetchTravelTime(fromId, toId, depTime, targetIdx) {
 }
 
 // ── Station dropdown change ──────────────────────────────────────────
-function onStopChange(select, idx) {
+// skipCalc = true when called during page init (existing data already has correct arrival/departure)
+function onStopChange(select, idx, skipCalc) {
   var stationId = parseInt(select.value, 10);
   var row = document.getElementById('stop-' + idx);
   var msg = document.getElementById('vmsg-' + idx);
@@ -440,7 +497,19 @@ function onStopChange(select, idx) {
   var prevSelect = prevRow.querySelector('select[name="stop_station_id"]');
   var prevDep    = document.getElementById('dep-' + prevIdx);
 
-  if (!prevSelect || !prevSelect.value || !prevDep || !prevDep.value) {
+  if (!prevSelect || !prevSelect.value) {
+    msg.textContent += ' · set previous stop departure first';
+    return;
+  }
+
+  // On page load (skipCalc=true): show distance/time info in label WITHOUT touching arrival/departure.
+  // On user change (skipCalc=false): full recalculation — clear arrival and fetch.
+  if (skipCalc) {
+    enrichDisplayInfo(parseInt(prevSelect.value), stationId, idx);
+    return;
+  }
+
+  if (!prevDep || !prevDep.value) {
     msg.textContent += ' · set previous stop departure first';
     return;
   }
@@ -452,6 +521,38 @@ function onStopChange(select, idx) {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function pad(n) { return String(n).padStart(2, '0'); }
+
+// ── Display-only distance fetch (page load) ───────────────────────────
+// Updates the validation label with km/min info WITHOUT touching arrival or departure.
+function enrichDisplayInfo(fromId, toId, targetIdx) {
+  var msg = document.getElementById('vmsg-' + targetIdx);
+  var key = fromId + '_' + toId;
+
+  // Use cache if available — no network call needed
+  if (_travelCache[key] !== undefined) {
+    var entry = _travelCache[key];
+    var st = stationMap[toId];
+    if (msg && st) {
+      msg.textContent = '\u2713 ' + st.station_name + ' \u00b7 ' + entry.km + ' km \u00b7 ~' + entry.min + ' min travel';
+      msg.className = 'validation-msg ok';
+    }
+    return;
+  }
+
+  fetch('/admin/api/calculate-journey?from_id=' + fromId + '&to_id=' + toId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.estimated_minutes && !data.error) {
+        _travelCache[key] = { min: data.estimated_minutes, km: data.distance_km };
+        var st = stationMap[toId];
+        if (msg) {
+          msg.textContent = '\u2713 ' + (st ? st.station_name : '') + ' \u00b7 ' + data.distance_km + ' km \u00b7 ~' + data.estimated_minutes + ' min travel';
+          msg.className = 'validation-msg ok';
+        }
+      }
+    })
+    .catch(function() { /* silent */ });
+}
 
 // ── Form validation ──────────────────────────────────────────────────
 function validateAllStops() {
@@ -508,13 +609,194 @@ function validateAndSave() {
   return validateAllStops();
 }
 
+// ── Cycle Schedule AJAX save ──────────────────────────────────────────
+function saveCycleSchedule() {
+  var startVal  = document.getElementById('cs-start').value;
+  var days      = parseInt(document.getElementById('cs-wait-days').value)  || 0;
+  var hours     = parseInt(document.getElementById('cs-wait-hours').value) || 0;
+  var enabled   = document.getElementById('cs-enabled').checked;
+
+  var btn = document.getElementById('cs-save-btn');
+  var msg = document.getElementById('cs-save-msg');
+  btn.disabled = true;
+  msg.style.display = 'none';
+
+  fetch('/admin/super/trains/{{ train.train_id }}/set-cycle-schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      start_datetime:    startVal,
+      return_wait_days:  days,
+      return_wait_hours: hours,
+      cycle_enabled:     enabled
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    if (data.ok) {
+      msg.textContent = '✓ Saved!';
+      msg.style.color = 'var(--green)';
+      msg.style.display = 'inline';
+      updateLivePreview();
+      setTimeout(function() { msg.style.display = 'none'; }, 3000);
+    } else {
+      msg.textContent = '✗ ' + (data.error || 'Save failed');
+      msg.style.color = 'var(--danger)';
+      msg.style.display = 'inline';
+    }
+  })
+  .catch(function() {
+    btn.disabled = false;
+    msg.textContent = '✗ Network error';
+    msg.style.color = 'var(--danger)';
+    msg.style.display = 'inline';
+  });
+}
+
+function renderCyclePreview(legs, enabled) {
+  var el = document.getElementById('cs-preview');
+  if (!enabled || !legs || !legs.length) {
+    el.innerHTML = '<span style="font-style:italic">Loop is disabled or no start date set.</span>';
+    return;
+  }
+  var icons = { forward: '🚂', return: '🔄' };
+  var colors = { forward: 'var(--accent)', return: 'var(--green)' };
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<tr style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px">'
+        + '<th style="text-align:left;padding:4px 6px">Leg</th>'
+        + '<th style="text-align:left;padding:4px 6px">Direction</th>'
+        + '<th style="text-align:left;padding:4px 6px">Departs</th>'
+        + '<th style="text-align:left;padding:4px 6px">Arrives</th>'
+        + '</tr>';
+  for (var i = 0; i < legs.length; i++) {
+    var l = legs[i];
+    var dir = l.direction === 'forward' ? '→ Forward' : '← Return';
+    html += '<tr style="border-top:1px solid var(--border)">'
+          + '<td style="padding:6px;font-weight:700;color:' + colors[l.direction] + '">' + l.leg + '</td>'
+          + '<td style="padding:6px">' + icons[l.direction] + ' ' + dir + '</td>'
+          + '<td style="padding:6px;color:var(--text)">' + l.departs + '</td>'
+          + '<td style="padding:6px;color:var(--text)">' + l.arrives + '</td>'
+          + '</tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+// ── Live Preview Calculation ───────────────────────────────────────────
+function updateLivePreview() {
+  var startVal = document.getElementById('cs-start').value;
+  var days     = parseInt(document.getElementById('cs-wait-days').value) || 0;
+  var hours    = parseInt(document.getElementById('cs-wait-hours').value) || 0;
+  var enabled  = document.getElementById('cs-enabled') ? document.getElementById('cs-enabled').checked : true;
+
+  if (!enabled || !startVal) {
+    renderCyclePreview([], enabled);
+    return;
+  }
+
+  var rows = document.querySelectorAll('#stops-container .stop-row');
+  if (rows.length < 2) return;
+
+  var totalMins = 0;
+  for (var i = 1; i < rows.length; i++) {
+    var prevRow = rows[i - 1], currRow = rows[i];
+    var pDep = document.getElementById('dep-' + prevRow.dataset.idx);
+    var cArr = document.getElementById('arr-' + currRow.dataset.idx);
+    
+    if (!pDep || !pDep.value || !cArr || !cArr.value) return; // incomplete route
+
+    var pd = pDep.value.split(':'), ca = cArr.value.split(':');
+    var pdm = parseInt(pd[0])*60 + parseInt(pd[1]);
+    var cam = parseInt(ca[0])*60 + parseInt(ca[1]);
+
+    var seg = cam - pdm;
+    if (seg < 0) seg += 24 * 60;
+    totalMins += seg;
+
+    if (i < rows.length - 1) {
+      var cDep = document.getElementById('dep-' + currRow.dataset.idx);
+      if (!cDep || !cDep.value) return;
+      var cd = cDep.value.split(':');
+      var cdm = parseInt(cd[0])*60 + parseInt(cd[1]);
+      var wait = cdm - cam;
+      if (wait < 0) wait += 24 * 60;
+      totalMins += wait;
+    }
+  }
+
+  var cursor = new Date(startVal);
+  var waitMs = (days * 24 + hours) * 60 * 60 * 1000;
+  var oneWayMs = totalMins * 60 * 1000;
+  var legs = [];
+  var direction = 'forward';
+
+  function fmtDate(d) {
+    var str = d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    return str.replace(' am', ' AM').replace(' pm', ' PM');
+  }
+
+  for (var leg = 1; leg <= 6; leg++) {
+    var arrive = new Date(cursor.getTime() + oneWayMs);
+    legs.push({
+      leg: leg,
+      direction: direction,
+      departs: fmtDate(cursor),
+      arrives: fmtDate(arrive)
+    });
+    cursor = new Date(arrive.getTime() + waitMs);
+    direction = direction === 'forward' ? 'return' : 'forward';
+  }
+
+  renderCyclePreview(legs, enabled);
+}
+
+// ── Recalculate all stop times from scratch ──────────────────────────
+// Keeps stop 1 departure as anchor, recalculates all subsequent arrivals.
+function recalculateAllTimes() {
+  _travelCache = {};  // clear to force fresh API calls
+  var rows = document.querySelectorAll('#stops-container .stop-row');
+  if (rows.length < 2) return;
+
+  // Clear arrival + departure for stops 2+ (stop 1 is the fixed anchor)
+  for (var i = 1; i < rows.length; i++) {
+    var idx = parseInt(rows[i].dataset.idx);
+    var arrEl = document.getElementById('arr-' + idx);
+    var depEl = document.getElementById('dep-' + idx);
+    if (arrEl) arrEl.value = '';
+    if (depEl) depEl.value = '';
+  }
+
+  // Trigger cascade from stop 1 — propagates through all stops async
+  var firstIdx = parseInt(rows[0].dataset.idx);
+  cascadeFrom(firstIdx);
+}
+
 // ── Init ─────────────────────────────────────────────────────────────
 (function init() {
   if (existingStops.length > 0) {
-    existingStops.forEach(function(s) { addStop(s.station_id, s.arrival, s.departure); });
+    // Precompute stored wait times so they survive recalculation
+    var waitMins = existingStops.map(function(s) {
+      if (!s.arrival || !s.departure) return 0;
+      var a = s.arrival.split(':'), d = s.departure.split(':');
+      var diff = (parseInt(d[0])*60 + parseInt(d[1])) - (parseInt(a[0])*60 + parseInt(a[1]));
+      if (diff < 0) diff += 24 * 60;
+      return Math.max(0, diff);
+    });
+
+    // Stop 1: use stored departure as the fixed anchor
+    addStop(existingStops[0].station_id, existingStops[0].arrival, existingStops[0].departure);
+
+    // Stops 2+: pass station + wait only — arrival recalculated fresh via API
+    for (var i = 1; i < existingStops.length; i++) {
+      addStop(existingStops[i].station_id, null, null, waitMins[i]);
+    }
   } else {
     addStop(); addStop();
   }
+  
+  // Initial preview render
+  setTimeout(updateLivePreview, 500);
 })();
 </script>
 {% endblock %}

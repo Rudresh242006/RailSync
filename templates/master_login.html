@@ -125,7 +125,7 @@
     /* ROLE TABS */
     .role-tabs {
       position: relative;
-      display: grid; grid-template-columns: 1fr 1fr;
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
       background: rgba(0,0,0,0.25); border-radius: 14px;
       margin-bottom: 28px; padding: 4px;
       border: 1px solid rgba(255,255,255,0.05);
@@ -139,7 +139,7 @@
     }
     .role-tab.active { color: #fff; }
     .tab-slider {
-      position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px);
+      position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(33.333% - 4px);
       background: rgba(34,197,94,0.2); border-radius: 10px;
       border: 1px solid rgba(34,197,94,0.25);
       box-shadow: 0 2px 12px rgba(34,197,94,0.15);
@@ -288,6 +288,7 @@
     <div class="tab-slider" id="tab-slider"></div>
     <button type="button" class="role-tab active" id="tab-admin" onclick="setRole('admin')"><i class="fa-solid fa-user-tie"></i> Station Master</button>
     <button type="button" class="role-tab" id="tab-super" onclick="setRole('super_admin')"><i class="fa-solid fa-globe"></i> Super Admin</button>
+    <button type="button" class="role-tab" id="tab-driver" onclick="setRole('driver')"><i class="fa-solid fa-train"></i> Train Driver</button>
   </div>
 
   <form method="POST" action="{{ url_for('auth.admin_login') }}" autocomplete="off">
@@ -319,11 +320,20 @@
 <script>
 function setRole(role) {
   document.getElementById('role-input').value = role;
+  
   const isAdmin = role === 'admin';
+  const isSuper = role === 'super_admin';
+  const isDriver = role === 'driver';
   
   document.getElementById('tab-admin').classList.toggle('active', isAdmin);
-  document.getElementById('tab-super').classList.toggle('active', !isAdmin);
-  document.getElementById('tab-slider').style.transform = isAdmin ? 'translateX(0)' : 'translateX(100%)';
+  document.getElementById('tab-super').classList.toggle('active', isSuper);
+  document.getElementById('tab-driver').classList.toggle('active', isDriver);
+  
+  let translateX = '0';
+  if (isSuper) translateX = '100%';
+  if (isDriver) translateX = '200%';
+  
+  document.getElementById('tab-slider').style.transform = `translateX(${translateX})`;
   
   localStorage.setItem('railSyncMasterRole', role);
 }

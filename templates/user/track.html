@@ -117,7 +117,7 @@
           <div style="display:flex;flex-direction:column;align-items:center">
             <div class="stop-dot {% if status and status.current_station_id == r.station_id %}current{% endif %}"></div>
             {% if not loop.last %}
-            <div style="width:2px;flex:1;background:var(--border);min-height:30px;margin:4px 0"></div>
+            <div class="stop-line" style="width:2px;flex:1;background:var(--border);min-height:30px;margin:4px 0;transition:background 0.4s"></div>
             {% endif %}
           </div>
           <div style="padding-bottom:20px;flex:1">
@@ -192,6 +192,7 @@ const TOTAL_STOPS = {{ routes | length }};
 
 // ── State ─────────────────────────────────────────────────────────
 let currentStationId = {{ status.current_station_id if status else 'null' }};
+let currentState = '{{ status.state if status else "stopped" }}';
 let pollTimer = null;
 
 // ── AJAX Status Poller ────────────────────────────────────────────
@@ -252,9 +253,10 @@ function applyLiveData(d) {
   }
 
   // ── Timeline stop highlighting ────────────────────────────────
-  if (d.current_station_id && d.current_station_id !== currentStationId) {
-    currentStationId = d.current_station_id;
-    updateTimeline(d.current_station_id);
+  if (d.current_station_id || d.state) {
+    if (d.current_station_id) currentStationId = d.current_station_id;
+    if (d.state) currentState = d.state;
+    updateTimeline(currentStationId, currentState);
   }
 
   // ── Progress bar ──────────────────────────────────────────────
@@ -271,23 +273,41 @@ function fadeUpdate(id, text) {
   }, 280);
 }
 
-function updateTimeline(activeSid) {
-  document.querySelectorAll('.stop-row').forEach(function(row) {
-    const sid = parseInt(row.dataset.sid);
+function updateTimeline(activeSid, activeState) {
+  const rows = Array.from(document.querySelectorAll('.stop-row'));
+  const activeIdx = rows.findIndex(r => parseInt(r.dataset.sid) === activeSid);
+
+  rows.forEach(function(row, i) {
     const dot  = row.querySelector('.stop-dot');
     const name = row.querySelector('.stop-name');
     const badge = row.querySelector('.live-badge');
+    const line = row.querySelector('.stop-line');
 
-    if (sid === activeSid) {
-      dot.classList.add('current');
+    // Reset basics
+    dot.classList.remove('current');
+    dot.style.background = '';
+    name.style.fontWeight = '400';
+    name.style.color = '';
+    if (badge) badge.style.display = 'none';
+    if (line) line.style.background = 'var(--border)';
+
+    if (i < activeIdx) {
+      // Completed station
+      dot.style.background = '#22c55e'; // Green dot
+      if (line) line.style.background = '#22c55e'; // Green line
+    } 
+    else if (i === activeIdx) {
+      // Current station
       name.style.fontWeight = '600';
       name.style.color = 'var(--accent2)';
       if (badge) badge.style.display = '';
-    } else {
-      dot.classList.remove('current');
-      name.style.fontWeight = '400';
-      name.style.color = '';
-      if (badge) badge.style.display = 'none';
+
+      if (activeState === 'en_route') {
+        dot.style.background = '#22c55e'; // Departed, so dot is green
+        if (line) line.style.background = '#22c55e'; // Moving to next, line is green
+      } else {
+        dot.classList.add('current');
+      }
     }
   });
 }
@@ -326,7 +346,7 @@ socket.on('new_notification', function(data) {
 
 // ── Init ──────────────────────────────────────────────────────────
 // Update timeline + progress bar immediately from server-rendered state
-updateTimeline(currentStationId);
+updateTimeline(currentStationId, currentState);
 updateProgress(currentStationId);
 
 // Start polling (first poll after POLL_MS; data already correct from server render)

@@ -31,8 +31,7 @@ def allocate():
     data = request.json
 
     result = allocate_platform(data)
-
-    return result
+    return jsonify(result)
 
 @api_bp.route('/notifications/unread-count')
 @login_required

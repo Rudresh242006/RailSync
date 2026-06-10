@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Dashboard - RailSync</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --success-hover: #059669;
+            --bg: #0f172a;
+            --surface: rgba(30, 41, 59, 0.7);
+            --surface-border: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .navbar {
+            width: 100%;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--surface-border);
+            z-index: 100;
+            box-sizing: border-box;
+        }
+
+        .navbar h2 {
+            margin: 0;
+            font-weight: 600;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logout-btn {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .logout-btn:hover {
+            color: white;
+        }
+
+        .dashboard-container {
+            margin-top: 40px;
+            margin-bottom: 40px;
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            box-sizing: border-box;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--surface-border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .train-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .train-name {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+        }
+
+        .train-number {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .status-stopped {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .status-en-route {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-idle {
+            background: rgba(148, 163, 184, 0.1);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .timer-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .timer {
+            font-size: 64px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .timer-label {
+            color: var(--text-muted);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn-arrive {
+            width: 100%;
+            border: none;
+            border-radius: 16px;
+            padding: 18px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            background: #334155;
+            color: #94a3b8;
+        }
+
+        .btn-arrive:not([disabled]) {
+            background: var(--success);
+            color: white;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+            animation: blink 1.5s infinite;
+        }
+
+        .btn-arrive:not([disabled]):hover {
+            background: var(--success-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.4);
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; box-shadow: 0 0 20px rgba(16, 185, 129, 0.5); }
+            50% { opacity: 0.7; box-shadow: 0 0 5px rgba(16, 185, 129, 0.2); }
+        }
+
+        /* Timeline Styles */
+        .timeline {
+            margin-top: 40px;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 24px;
+            width: 2px;
+            background: var(--surface-border);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 60px;
+            margin-bottom: 24px;
+        }
+        
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 17px;
+            top: 24px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: 2px solid var(--text-muted);
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+        .timeline-item.active .timeline-dot {
+            border-color: var(--primary);
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .timeline-item.passed .timeline-dot {
+            border-color: var(--success);
+            background: var(--success);
+        }
+
+        .timeline-content {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 16px 20px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timeline-item.passed .timeline-content {
+            opacity: 0.6;
+        }
+        
+        .timeline-item.active .timeline-content {
+            border: 1px solid rgba(79, 70, 229, 0.3);
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .station-details h3 {
+            margin: 0 0 4px 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .station-details p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        
+        .platform-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 6px;
+            display: inline-block;
+        }
+
+        .time-info {
+            text-align: right;
+        }
+
+        .time-info div {
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .time-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        
+        .error-msg {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <h2>RailSync Driver</h2>
+        <a href="{{ url_for('auth.logout') }}" class="logout-btn">Sign Out</a>
+    </nav>
+
+    <div class="dashboard-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages" style="margin-bottom: 20px;">
+                    {% for category, message in messages %}
+                        <div style="padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; font-weight: 500;
+                            {% if category == 'success' %}background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);{% else %}background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% if error %}
+            <div class="card">
+                <div class="error-msg">{{ error }}</div>
+            </div>
+        {% elif not route_details %}
+            <div class="card" style="text-align: center;">
+                <h1 class="train-name">{{ train.train_name }}</h1>
+                <div class="train-number">{{ train.train_number }}</div>
+                <div class="status-badge status-idle" style="margin-top: 20px;">Journey Not Scheduled</div>
+                <p style="color: var(--text-muted); margin-top: 20px;">This train is currently idle. Wait for Super Admin to schedule the next cycle.</p>
+            </div>
+        {% else %}
+        <div class="card">
+            <div class="train-header">
+                {% if status.state == 'stopped' %}
+                    <div class="status-badge status-stopped">Stopped at Station</div>
+                {% elif status.state == 'en_route' %}
+                    <div class="status-badge status-en-route">En Route</div>
+                {% else %}
+                    <div class="status-badge status-idle">Not Started</div>
+                {% endif %}
+                <h1 class="train-name">{{ train.train_name }}</h1>
+                <div class="train-number">{{ train.train_number }}</div>
+            </div>
+
+            {% if status.state == 'en_route' and next_detail %}
+                <div class="timer-container" id="timerContainer">
+                    <div class="timer" id="timerDisplay">--:--</div>
+                    <div class="timer-label">Time to {{ next_detail.station.station_name }}</div>
+                </div>
+                <button class="btn-arrive" id="arriveBtn" onclick="arriveStation()" disabled>Confirm Arrival at {{ next_detail.station.station_name }}</button>
+            {% elif status.state == 'stopped' and current_detail %}
+                {% if next_detail %}
+                <div class="timer-container" id="timerContainer">
+                    <div class="timer" id="timerDisplay">--:--</div>
+                    <div class="timer-label">Departure to {{ next_detail.station.station_name }}</div>
+                </div>
+                {% else %}
+                <div class="timer-container" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2);">
+                    <div class="timer" style="color: #10b981; font-size: 36px; margin-bottom: 5px;">Journey Completed</div>
+                    <div class="timer-label" style="color: #10b981;">End of Line Reached</div>
+                </div>
+                {% endif %}
+            {% endif %}
+
+            <div class="timeline">
+                {% set ns = namespace(passed=true) %}
+                {% for rd in route_details %}
+                    {% if current_detail and rd.route.station_id == current_detail.route.station_id %}
+                        {% if status.state == 'stopped' %}
+                            {% set ns.passed = false %}
+                        {% endif %}
+                    {% elif next_detail and rd.route.station_id == next_detail.route.station_id %}
+                        {% set ns.passed = false %}
+                    {% endif %}
+                    
+                    {% set is_active = false %}
+                    {% if status.state == 'stopped' and current_detail and rd.route.station_id == current_detail.route.station_id %}
+                        {% set is_active = true %}
+                    {% elif status.state == 'en_route' and next_detail and rd.route.station_id == next_detail.route.station_id %}
+                        {% set is_active = true %}
+                    {% endif %}
+                    
+                    <div class="timeline-item {% if ns.passed %}passed{% endif %} {% if is_active %}active{% endif %}">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <div class="station-details">
+                                <h3>{{ rd.station.station_name }}</h3>
+                                <p>{{ rd.station.city }}</p>
+                                <div class="platform-badge">Platform {{ rd.platform }}</div>
+                            </div>
+                            <div class="time-info">
+                                <div><span class="time-label">Arr:</span> {{ rd.actual_arrival.strftime('%b %d, %I:%M %p') }}</div>
+                                <div><span class="time-label">Dep:</span> {{ rd.actual_departure.strftime('%b %d, %I:%M %p') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        {% if route_details %}
+        const state = "{{ status.state }}";
+        
+        // Local time strings from Jinja (no Z appended, so JS parses as local)
+        const targetArrival = {% if next_detail %}"{{ next_detail.actual_arrival.isoformat() }}"{% else %}null{% endif %};
+        const targetDeparture = {% if current_detail %}"{{ current_detail.actual_departure.isoformat() }}"{% else %}null{% endif %};
+        
+        const timerDisplay = document.getElementById('timerDisplay');
+        const arriveBtn = document.getElementById('arriveBtn');
+        let timerInterval;
+
+        function updateTimer() {
+            if (state === 'en_route' && targetArrival) {
+                let end = new Date(targetArrival);
+                let now = new Date();
+                let diff = end - now;
+                
+                if (diff <= 0) {
+                    clearInterval(timerInterval);
+                    timerDisplay.innerText = "00:00";
+                    timerDisplay.style.color = "var(--success)";
+                    if (arriveBtn) {
+                        arriveBtn.disabled = false;
+                        arriveBtn.innerText = "Click to Confirm Arrival";
+                    }
+                } else {
+                    formatAndDisplay(diff);
+                }
+            } else if (state === 'stopped' && targetDeparture) {
+                let end = new Date(targetDeparture);
+                let now = new Date();
+                let diff = end - now;
+                
+                if (diff <= 0) {
+                    clearInterval(timerInterval);
+                    timerDisplay.innerText = "00:00";
+                    // Train should auto-depart, so reload page to let server transition state
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    formatAndDisplay(diff);
+                }
+            }
+        }
+        
+        function formatAndDisplay(diffMs) {
+            let totalSeconds = Math.floor(diffMs / 1000);
+            let hours = Math.floor(totalSeconds / 3600);
+            let min = Math.floor((totalSeconds % 3600) / 60);
+            let sec = totalSeconds % 60;
+            
+            if (hours > 0) {
+                timerDisplay.innerText = `${hours}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            } else {
+                timerDisplay.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            }
+        }
+
+        if (timerDisplay) {
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        async function arriveStation() {
+            if (!arriveBtn || arriveBtn.disabled) return;
+            arriveBtn.disabled = true;
+            arriveBtn.innerText = "Confirming...";
+            
+            try {
+                let res = await fetch('/driver/api/arrive', { method: 'POST' });
+                let data = await res.json();
+                if (data.ok) {
+                    location.reload();
+                } else {
+                    alert(data.error);
+                    arriveBtn.disabled = false;
+                    arriveBtn.innerText = "Click to Confirm Arrival";
+                }
+            } catch (e) {
+                alert("Error confirming arrival");
+                arriveBtn.disabled = false;
+                arriveBtn.innerText = "Click to Confirm Arrival";
+            }
+        }
+        {% endif %}
+    </script>
+</body>
+</html>

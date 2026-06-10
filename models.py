@@ -6,8 +6,17 @@ from enum import Enum as PyEnum
 
 @login_manager.user_loader
 def load_user(user_id):
+    if not isinstance(user_id, str) or '_' not in user_id:
+        # Legacy or malformed session — try as a plain user id
+        try:
+            return User.query.get(int(user_id))
+        except (ValueError, TypeError):
+            return None
     if user_id.startswith('master_'):
         return StationMaster.query.get(int(user_id.split('_')[1]))
+    if user_id.startswith('driver_'):
+        from models import TrainDriver
+        return TrainDriver.query.get(int(user_id.split('_')[1]))
     return User.query.get(int(user_id.split('_')[1]))
 
 
@@ -65,6 +74,24 @@ class StationMaster(db.Model, UserMixin):
         return 'super_admin' if self.is_super_admin else 'admin'
 
 
+class TrainDriver(db.Model, UserMixin):
+    __tablename__ = 'TrainDriver'
+    driver_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    train_id = db.Column(db.Integer, db.ForeignKey('Train.train_id', ondelete='CASCADE'), nullable=False)
+
+    train = db.relationship('Train', backref='driver', uselist=False)
+
+    def get_id(self):
+        return f'driver_{self.driver_id}'
+
+    @property
+    def role(self):
+        return 'driver'
+
+
 class Train(db.Model):
     __tablename__ = 'Train'
     train_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -74,6 +101,11 @@ class Train(db.Model):
     # Round-trip settings
     turnaround_minutes = db.Column(db.Integer, default=360)   # real-world wait at each terminal (mins)
     anim_speed_scale   = db.Column(db.Float,   default=8.0)   # animation-seconds per real-hour of wait
+    # Cycle schedule — set by Super Admin
+    service_start_date  = db.Column(db.DateTime, nullable=True)  # first departure datetime
+    return_wait_days    = db.Column(db.Integer, default=0)        # days to wait at destination before return
+    return_wait_hours   = db.Column(db.Integer, default=0)        # hours to wait at destination before return
+    cycle_enabled       = db.Column(db.Boolean, default=False)    # whether loop is active
 
     routes = db.relationship('TrainRoute', backref='train', lazy=True, cascade='all, delete-orphan')
     statuses = db.relationship('TrainStatus', backref='train', lazy=True, cascade='all, delete-orphan')
@@ -122,8 +154,89 @@ class TrainStatus(db.Model):
     # Journey scheduling — set by Super Admin
     journey_start_datetime = db.Column(db.DateTime, nullable=True)   # when train left its current origin
     journey_direction      = db.Column(db.String(10), default='idle') # 'forward' | 'reverse' | 'idle'
+    
+    # Driver tracking
+    state = db.Column(db.String(20), default='stopped') # 'stopped' or 'en_route'
+    current_departure_time = db.Column(db.DateTime, nullable=True) # when train started moving to next station
 
     current_station = db.relationship('Station', backref='train_statuses')
+
+    def get_route_details(self):
+        """Calculates actual arrival and departure times based on schedule, start time, and delays."""
+        from datetime import timedelta
+        if not self.journey_start_datetime or self.journey_direction not in ['forward', 'reverse']:
+            return []
+            
+        routes = TrainRoute.query.filter_by(train_id=self.train_id).order_by(TrainRoute.stop_number).all()
+        ordered_routes = list(routes)
+        if self.journey_direction == 'reverse':
+            ordered_routes.reverse()
+            
+        cursor_dt = self.journey_start_datetime
+        if self.journey_direction == 'forward' and ordered_routes and ordered_routes[0].departure_time:
+            cursor_dt = cursor_dt.replace(
+                hour=ordered_routes[0].departure_time.hour,
+                minute=ordered_routes[0].departure_time.minute,
+                second=0, microsecond=0
+            )
+            
+        details = []
+        for i, r in enumerate(ordered_routes):
+            travel_m = 0
+            if i > 0:
+                prev_r = ordered_routes[i-1]
+                if self.journey_direction == 'forward':
+                    if r.arrival_time and prev_r.departure_time:
+                        arr_m = r.arrival_time.hour * 60 + r.arrival_time.minute
+                        dep_m = prev_r.departure_time.hour * 60 + prev_r.departure_time.minute
+                        time_diff = arr_m - dep_m
+                        if time_diff < 0: time_diff += 24*60
+                        
+                        est_min = r.estimated_travel_min or time_diff
+                        days = round((est_min - time_diff) / (24 * 60))
+                        travel_m = time_diff + days * 24 * 60
+                    else:
+                        travel_m = r.estimated_travel_min or 60
+                else:
+                    if prev_r.arrival_time and r.departure_time:
+                        arr_m = prev_r.arrival_time.hour * 60 + prev_r.arrival_time.minute
+                        dep_m = r.departure_time.hour * 60 + r.departure_time.minute
+                        time_diff = arr_m - dep_m
+                        if time_diff < 0: time_diff += 24*60
+                        
+                        est_min = r.estimated_travel_min or time_diff
+                        days = round((est_min - time_diff) / (24 * 60))
+                        travel_m = time_diff + days * 24 * 60
+                    else:
+                        travel_m = r.estimated_travel_min or 60
+                        
+            cursor_dt += timedelta(minutes=travel_m)
+            arrival_dt = cursor_dt
+            
+            wait_m = 5
+            if r.arrival_time and r.departure_time:
+                arr_m = r.arrival_time.hour * 60 + r.arrival_time.minute
+                dep_m = r.departure_time.hour * 60 + r.departure_time.minute
+                wait_m = dep_m - arr_m
+                if wait_m < 0: wait_m += 24*60
+                
+            if i == 0:
+                wait_m = 0
+                
+            departure_dt = cursor_dt + timedelta(minutes=wait_m)
+            actual_arr = arrival_dt + timedelta(minutes=self.delay_minutes)
+            actual_dep = departure_dt + timedelta(minutes=self.delay_minutes)
+            
+            details.append({
+                'route': r,
+                'station_id': r.station_id,
+                'actual_arrival': actual_arr,
+                'actual_departure': actual_dep
+            })
+            
+            cursor_dt = departure_dt
+            
+        return details
 
 
 class Booking(db.Model):
@@ -135,7 +248,7 @@ class Booking(db.Model):
     destination_station_id = db.Column(db.Integer, db.ForeignKey('Station.station_id'), nullable=False)
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
     journey_date = db.Column(db.Date, nullable=False)
-    seat_number = db.Column(db.String(10), nullable=True)
+    seat_number = db.Column(db.String(100), nullable=True)
     status = db.Column(db.Enum('CONFIRMED', 'WAITLISTED', 'CANCELLED'), default='CONFIRMED')
 
     __table_args__ = (db.UniqueConstraint('train_id', 'journey_date', 'seat_number', name='uq_train_date_seat'),)

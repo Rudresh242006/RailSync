@@ -34,13 +34,18 @@
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
     {% for p in platforms %}
-    {% set alloc = p.allocations|selectattr('departure_time', 'gt', now)|list|first %}
+    {% set ns = namespace(alloc=none) %}
+    {% for a in p.allocations %}
+      {% if a.arrival_time <= now and a.departure_time >= now %}
+        {% set ns.alloc = a %}
+      {% endif %}
+    {% endfor %}
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px">
       <div style="font-size:22px;font-weight:800;color:var(--accent2)">Platform {{ p.platform_number }}</div>
-      {% if alloc %}
+      {% if ns.alloc %}
       <div style="margin-top:8px">
-        <div style="font-size:12px;font-weight:600">{{ alloc.train.train_name }}</div>
-        <div style="font-size:11px;color:var(--muted)">{{ alloc.arrival_time.strftime('%H:%M') }} – {{ alloc.departure_time.strftime('%H:%M') }}</div>
+        <div style="font-size:12px;font-weight:600">{{ ns.alloc.train.train_name }}</div>
+        <div style="font-size:11px;color:var(--muted)">{{ ns.alloc.arrival_time.strftime('%H:%M') }} – {{ ns.alloc.departure_time.strftime('%H:%M') }}</div>
         <span class="badge badge-blue" style="margin-top:4px">Occupied</span>
       </div>
       {% else %}
@@ -54,16 +59,51 @@
   </div>
 </div>
 
-<!-- DELAYED TRAINS -->
-{% if delayed %}
-<div class="card">
+<!-- STOPPED TRAINS (DELAY REPORTING) -->
+{% if stopped_trains %}
+<div class="card" style="margin-bottom:20px">
   <div class="card-header">
-    <div class="card-title" style="color:var(--amber)">⚠ Delayed Trains</div>
-    <a href="{{ url_for('admin.report_delay') }}" class="btn btn-ghost btn-sm">Report Delay</a>
+    <div class="card-title">🚂 Trains Currently Stopped Here</div>
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Train</th><th>Delay</th><th>Current Station</th><th>Last Updated</th><th>Action</th></tr></thead>
+      <thead><tr><th>Train</th><th>Current Delay</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for s in stopped_trains %}
+        <tr>
+          <td>
+            <div style="font-weight:600">{{ s.train.train_name }}</div>
+            <div class="mono">{{ s.train.train_number }}</div>
+          </td>
+          <td>
+            {% if s.delay_minutes > 0 %}
+            <span class="delay-pill {% if s.delay_minutes > 30 %}delay-crit{% else %}delay-warn{% endif %}">
+              +{{ s.delay_minutes }} min
+            </span>
+            {% else %}
+            <span class="badge badge-green">On Time</span>
+            {% endif %}
+          </td>
+          <td>
+            <button onclick="openDelayModal({{ s.train_id }}, '{{ s.train.train_name }} ({{ s.train.train_number }})')" class="btn btn-ghost btn-sm" style="color:var(--amber)">Report Delay ⏱</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- DELAYED TRAINS OVERVIEW -->
+{% if delayed %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title" style="color:var(--amber)">⚠ System Delayed Trains</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Train</th><th>Delay</th><th>Current Station</th><th>Last Updated</th></tr></thead>
       <tbody>
         {% for s in delayed %}
         <tr>
@@ -76,11 +116,8 @@
               +{{ s.delay_minutes }} min
             </span>
           </td>
-          <td>{{ s.current_station.station_name }}</td>
-          <td style="font-size:12px;color:var(--muted)">{{ s.last_updated.strftime('%H:%M:%S') }}</td>
-          <td>
-            <a href="{{ url_for('admin.report_delay') }}" class="btn btn-ghost btn-sm">Update →</a>
-          </td>
+          <td>{{ s.current_station.station_name if s.current_station else 'N/A' }}</td>
+          <td style="font-size:12px;color:var(--muted)">{{ s.last_updated.strftime('%H:%M:%S') if s.last_updated else 'N/A' }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -88,10 +125,39 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Delay Reporting Modal -->
+<div id="delayModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center;">
+  <div class="card" style="width:100%; max-width:400px; padding:24px;">
+    <h3 style="margin-top:0;">Report Delay</h3>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">
+      Reporting delay for <strong id="delayTrainName"></strong>.
+      This will add to its accumulated delay.
+    </p>
+    <form id="delayForm" method="POST">
+      <div class="form-group">
+        <label>Delay Minutes (Add)</label>
+        <input type="number" name="delay_minutes" min="1" max="1440" required placeholder="e.g. 15">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+        <button type="button" class="btn btn-ghost" onclick="closeDelayModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background:var(--amber); color:#000;">Add Delay</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-// inject `now` for Jinja comparison
+function openDelayModal(trainId, trainName) {
+  document.getElementById('delayTrainName').innerText = trainName;
+  document.getElementById('delayForm').action = "/admin/delay/report/" + trainId;
+  document.getElementById('delayModal').style.display = "flex";
+}
+function closeDelayModal() {
+  document.getElementById('delayModal').style.display = "none";
+}
 </script>
 {% endblock %}

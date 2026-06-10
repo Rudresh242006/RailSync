@@ -16,7 +16,14 @@
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;position:relative">
           <div style="font-size:32px;font-weight:800;color:var(--accent2)">{{ p.platform_number }}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px">Platform</div>
-          {% if p.is_available %}
+          {% set ns = namespace(occupied=false) %}
+          {% for a in allocations %}
+            {% if a.platform_id == p.platform_id and a.arrival_time <= now and a.departure_time >= now %}
+              {% set ns.occupied = true %}
+            {% endif %}
+          {% endfor %}
+          
+          {% if not ns.occupied %}
           <span class="badge badge-green" style="margin-top:8px;display:inline-block">Available</span>
           {% else %}
           <span class="badge badge-red" style="margin-top:8px;display:inline-block">Occupied</span>

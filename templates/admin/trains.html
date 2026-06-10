@@ -48,7 +48,16 @@
             {% else %}
             <span style="color:var(--muted);font-size:12px">No status</span>
             {% endif %}
+            {% if train.service_start_date %}
+            <div style="margin-top:5px">
+              <span style="font-size:10px;background:rgba(99,102,241,0.12);color:var(--accent);
+                           border-radius:6px;padding:2px 7px;font-weight:600;letter-spacing:.3px">
+                🗓 {{ train.service_start_date.strftime('%d %b %Y, %H:%M') }}
+              </span>
+            </div>
+            {% endif %}
           </td>
+
           <td>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               {% if current_user.role == 'super_admin' %}

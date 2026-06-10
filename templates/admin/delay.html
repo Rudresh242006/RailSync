@@ -22,7 +22,7 @@
       </div>
       <div class="form-group">
         <label>Delay (minutes)</label>
-        <input type="number" name="delay_minutes" placeholder="e.g. 30" required min="1">
+        <input type="number" name="delay_minutes" placeholder="e.g. 30" required min="1" onwheel="this.blur()">
       </div>
       <div class="form-group">
         <label>Problem Description</label>
@@ -37,8 +37,10 @@
     </form>
   </div>
 
-  <!-- AI RESULT PANEL -->
-  <div>
+  <!-- Right column stacked -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+
+    <!-- AI RESULT PANEL -->
     {% if ai_result %}
     <div class="card" style="border-color:rgba(108,99,255,0.4)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
@@ -91,6 +93,62 @@
       <div style="font-size:13px;color:var(--muted)">Report a delay to get instant platform reallocation suggestions</div>
     </div>
     {% endif %}
-  </div>
+
+    <!-- ── Currently Delayed Trains at Your Station ────────────────── -->
+    <div class="card">
+      <div class="card-header" style="margin-bottom:16px">
+        <div>
+          <div class="card-title">🚨 Active Delays at Your Station</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">
+            Clear a delay once the train is back on schedule — passengers will be notified automatically.
+          </div>
+        </div>
+      </div>
+
+      {% set delayed_trains = [] %}
+      {% for t in trains %}
+        {% set status = t.statuses|first %}
+        {% if status and status.delay_minutes > 0 %}
+          {% set _ = delayed_trains.append(t) %}
+        {% endif %}
+      {% endfor %}
+
+      {% if delayed_trains %}
+        {% for t in delayed_trains %}
+          {% set status = t.statuses|first %}
+          <div style="display:flex;align-items:center;justify-content:space-between;
+                      padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;
+                      background:rgba(239,68,68,0.05)">
+            <div>
+              <div style="font-weight:700;font-size:14px">
+                <span class="mono" style="color:var(--accent)">{{ t.train_number }}</span>
+                &nbsp;{{ t.train_name }}
+              </div>
+              <div style="margin-top:4px">
+                <span class="delay-pill delay-{% if status.delay_minutes > 30 %}crit{% else %}warn{% endif %}">
+                  +{{ status.delay_minutes }} min delay
+                </span>
+              </div>
+            </div>
+            <form method="POST" action="{{ url_for('admin.clear_delay', train_id=t.train_id) }}"
+                  onsubmit="return confirm('Clear the delay for {{ t.train_name }}? Passengers will be notified.')">
+              <button type="submit" class="btn btn-ghost btn-sm"
+                      style="border-color:var(--green);color:var(--green)">
+                ✓ Clear Delay
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div style="text-align:center;padding:24px;color:var(--muted)">
+          <div style="font-size:28px;margin-bottom:8px">✅</div>
+          <div style="font-weight:600;color:var(--green)">All trains are on time!</div>
+          <div style="font-size:12px;margin-top:4px">No active delays at your station.</div>
+        </div>
+      {% endif %}
+    </div>
+
+  </div><!-- end right column -->
 </div>
 {% endblock %}
+

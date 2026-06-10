@@ -2,17 +2,48 @@
 {% block title %}Search Trains{% endblock %}
 {% block page_title %}Search & Book Trains{% endblock %}
 
+{% block extra_head %}
+<style>
+.seat-map-grid {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 10px; margin-bottom: 20px;
+  overflow-x: auto; padding-bottom: 10px;
+}
+.seat-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.seat-btn {
+  width: 32px; height: 32px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); transition: all 0.2s;
+}
+.seat-btn:hover:not(.booked) {
+  border-color: var(--primary); background: rgba(100, 108, 255, 0.1);
+}
+.seat-btn.selected {
+  background: var(--primary); color: white; border-color: var(--primary);
+}
+.seat-btn.booked {
+  background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2);
+  color: var(--text-muted); cursor: not-allowed;
+}
+.aisle-gap { width: 16px; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card" style="margin-bottom:24px">
   <div class="card-title" style="margin-bottom:16px">Find Your Train</div>
-  <form method="POST">
+  <form method="GET">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:end">
       <div class="form-group" style="margin-bottom:0">
         <label>From</label>
         <select name="source_station_id" required>
           <option value="">Select origin</option>
           {% for s in stations %}
-          <option value="{{ s.station_id }}">{{ s.station_name }} ({{ s.city }})</option>
+          <option value="{{ s.station_id }}" {% if src_id == s.station_id %}selected{% endif %}>{{ s.station_name }} ({{ s.city }})</option>
           {% endfor %}
         </select>
       </div>
@@ -21,13 +52,13 @@
         <select name="destination_station_id" required>
           <option value="">Select destination</option>
           {% for s in stations %}
-          <option value="{{ s.station_id }}">{{ s.station_name }} ({{ s.city }})</option>
+          <option value="{{ s.station_id }}" {% if dst_id == s.station_id %}selected{% endif %}>{{ s.station_name }} ({{ s.city }})</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-group" style="margin-bottom:0">
         <label>Journey Date</label>
-        <input type="date" name="journey_date" required min="{{ today }}">
+        <input type="date" name="journey_date" required min="{{ today }}" value="{{ journey_date or '' }}">
       </div>
       <button type="submit" class="btn btn-primary" style="height:42px;white-space:nowrap">
         🔍 Search
@@ -62,6 +93,8 @@
         <span style="color:{% if t.available_seats > 10 %}var(--green){% elif t.available_seats > 0 %}var(--amber){% else %}var(--red){% endif %}">
           {{ t.available_seats }} available
         </span>
+        <span>·</span>
+        <span>Distance: {{ "%.1f"|format(t.total_distance) }} km</span>
       </div>
     </div>
 
@@ -82,14 +115,37 @@
       <input type="hidden" name="source_station_id" value="{{ t.src_id }}">
       <input type="hidden" name="destination_station_id" value="{{ t.dst_id }}">
       <input type="hidden" name="journey_date" value="{{ t.journey_date }}">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:end">
-        <div class="form-group" style="margin-bottom:0">
-          <label>Seat Preference</label>
-          <select name="seat_preference">
-            <option value="any">Any Seat</option>
-            <option value="window">Window Seat (A/F)</option>
-          </select>
+      
+      <!-- Interactive Seat Selection -->
+      <div style="margin-bottom: 20px;">
+        <label style="display:block;margin-bottom:8px;font-weight:600">Select Seats (Optional - click to select)</label>
+        <div class="seat-map-grid">
+          <div class="seat-row" style="margin-bottom: 4px;">
+            <div style="width:20px;"></div>
+            {% for c in ['A','B','C','D','E','F'] %}
+              <div style="width:32px;text-align:center;font-size:10px;color:var(--text-muted)">{{ c }}</div>
+              {% if c == 'C' %}<div class="aisle-gap"></div>{% endif %}
+            {% endfor %}
+          </div>
+          {% for r in range(1, 10) %}
+          <div class="seat-row">
+            <div style="width:20px;text-align:center;font-size:11px;color:var(--text-muted)">{{ r }}</div>
+            {% for c in ['A','B','C','D','E','F'] %}
+              {% set s_id = r|string + c %}
+              {% if s_id in t.booked_seats %}
+                <div class="seat-btn booked" title="{{ s_id }} (Booked)">✕</div>
+              {% else %}
+                <div class="seat-btn available" data-seat="{{ s_id }}" data-train="{{ t.train.train_id }}" onclick="toggleSeat(this, '{{ s_id }}', {{ t.train.train_id }}, {{ t.ticket_price }})">{{ s_id }}</div>
+              {% endif %}
+              {% if c == 'C' %}<div class="aisle-gap"></div>{% endif %}
+            {% endfor %}
+          </div>
+          {% endfor %}
         </div>
+        <input type="hidden" name="selected_seats" id="selected_seats_{{ t.train.train_id }}" value="">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end">
         <div class="form-group" style="margin-bottom:0">
           <label>Payment Method</label>
           <select name="payment_method">
@@ -98,8 +154,8 @@
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label>Amount (₹)</label>
-          <input type="number" name="amount" value="500" min="1" step="0.01">
+          <label>Total Amount (₹)</label>
+          <input type="number" name="amount" id="amount_{{ t.train.train_id }}" value="{{ "%.2f"|format(t.ticket_price) }}" min="1" step="0.01" readonly style="background-color: var(--surface); color: var(--text-muted); border-color: var(--surface-border);">
         </div>
         <button type="submit" class="btn btn-primary" style="height:42px">Confirm →</button>
       </div>
@@ -108,7 +164,7 @@
 </div>
 {% endfor %}
 
-{% elif request.method == 'POST' %}
+{% elif request.method == 'GET' and request.args.get('source_station_id') %}
 <div class="card" style="text-align:center;padding:60px">
   <div style="font-size:48px;margin-bottom:12px">🚫</div>
   <div style="font-size:16px;font-weight:600;margin-bottom:6px">No trains found</div>
@@ -124,6 +180,29 @@ document.querySelector('input[type=date]').min = new Date().toISOString().split(
 function toggleBookForm(id) {
   const el = document.getElementById('book-form-' + id);
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+let selectedSeatsByTrain = {};
+
+function toggleSeat(el, seatId, trainId, ticketPrice) {
+  if (!selectedSeatsByTrain[trainId]) {
+    selectedSeatsByTrain[trainId] = [];
+  }
+  
+  const index = selectedSeatsByTrain[trainId].indexOf(seatId);
+  if (index === -1) {
+    selectedSeatsByTrain[trainId].push(seatId);
+    el.classList.add('selected');
+  } else {
+    selectedSeatsByTrain[trainId].splice(index, 1);
+    el.classList.remove('selected');
+  }
+  
+  document.getElementById('selected_seats_' + trainId).value = selectedSeatsByTrain[trainId].join(',');
+  
+  const numSeats = selectedSeatsByTrain[trainId].length;
+  const totalAmount = numSeats > 0 ? (ticketPrice * numSeats).toFixed(2) : ticketPrice.toFixed(2);
+  document.getElementById('amount_' + trainId).value = totalAmount;
 }
 </script>
 {% endblock %}

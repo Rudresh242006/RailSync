@@ -5,44 +5,52 @@
 {% block extra_head %}
 <style>
   .stop-row {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 16px 14px;
+    margin-bottom: 14px;
+    position: relative;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .stop-row:hover { border-color: var(--border2); }
+  .stop-row .stop-badge {
+    position: absolute; top: -11px; left: 14px;
+    background: var(--accent); color: white;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 10px; border-radius: 20px; letter-spacing: .5px;
+  }
+  .stop-row.calculating { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(245,158,11,0.1); }
+  .stop-row.validated   { border-color: var(--green); }
+
+  .stop-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr auto;
+    grid-template-columns: 2.5fr 1fr 1fr 1fr auto;
     gap: 10px;
     align-items: end;
-    margin-bottom: 10px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px 10px;
-    position: relative;
   }
-  .stop-row .stop-num {
-    position: absolute;
-    top: -10px;
-    left: 14px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--muted);
-    background: var(--bg3);
-    padding: 0 6px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
+  .col-labels {
+    display: grid;
+    grid-template-columns: 2.5fr 1fr 1fr 1fr auto;
+    gap: 10px;
+    margin-bottom: 4px;
   }
-  .stop-row select.invalid-stop {
-    border-color: var(--red) !important;
-    box-shadow: 0 0 0 2px rgba(239,68,68,0.15);
+  .col-label {
+    font-size: 10px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .8px;
+    padding-left: 2px;
   }
-  .stop-row select.valid-stop {
-    border-color: var(--green) !important;
-    box-shadow: 0 0 0 2px rgba(34,197,94,0.10);
-  }
-  .stop-hint {
-    font-size: 11px;
-    margin-top: 3px;
-    display: none;
-  }
-  .stop-hint.err { color: var(--red); display: block; }
-  .stop-hint.ok  { color: var(--green); display: block; }
+  .wait-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .wait-row input { font-size: 13px; text-align: center; }
+  .wait-label { font-size: 9px; color: var(--muted); text-align: center; margin-top: 3px; letter-spacing: .5px; }
+
+  .validation-msg { font-size: 11px; margin-top: 4px; }
+  .validation-msg.ok   { color: var(--green); }
+  .validation-msg.warn { color: var(--amber); }
+  .validation-msg.calc { color: var(--amber); }
+
+  input[readonly] { opacity: 0.7; cursor: not-allowed; }
+
   .dup-warn {
     font-size: 12px;
     color: var(--amber);
@@ -52,12 +60,12 @@
   .dup-warn.show { display: block; }
 </style>
 
-{# ── JSON data island: IDE treats this as opaque data, not JS ── #}
+{# ── JSON data island ── #}
 <script type="application/json" id="stations-data">{{ stations|tojson }}</script>
 {% endblock %}
 
 {% block content %}
-<div class="card" style="max-width:760px">
+<div class="card" style="max-width:940px">
   <div class="card-header" style="margin-bottom:20px">
     <div class="card-title">New Train Details</div>
     <a href="{{ url_for('admin.trains') }}" class="btn btn-ghost btn-sm">← Back</a>
@@ -79,7 +87,7 @@
       </div>
       <div class="form-group" style="margin-bottom:0">
         <label>Total Seats</label>
-        <input type="number" name="total_seats" placeholder="500" required min="1">
+        <input type="number" name="total_seats" placeholder="500" required min="1" onwheel="this.blur()">
       </div>
     </div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:20px">
@@ -90,13 +98,23 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div>
           <div style="font-weight:600;font-size:15px">Route Stops</div>
-          <div style="font-size:12px;color:var(--muted)">Each stop must match a registered station name or city.</div>
+          <div style="font-size:12px;color:var(--muted)">Set Arrival &amp; Waiting time → Departure auto-calculated. Changing any time cascades to all stops below.</div>
         </div>
-        <button type="button" onclick="addStop()" class="btn btn-ghost btn-sm">+ Add Stop</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="stop-counter" id="stop-counter" style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--text)">0 stops</div>
+          <button type="button" onclick="addStop()" class="btn btn-ghost btn-sm">+ Add Stop</button>
+        </div>
       </div>
-      <div id="stops-container">
-        <!-- Stops added dynamically -->
+
+      <div class="col-labels" id="col-headers" style="display:none;padding:0 0 2px 4px">
+        <span class="col-label">Station</span>
+        <span class="col-label">Arrival</span>
+        <span class="col-label">Waiting Time</span>
+        <span class="col-label">Departure</span>
+        <span></span>
       </div>
+
+      <div id="stops-container"></div>
     </div>
 
     <div style="display:flex;gap:10px">
@@ -107,22 +125,29 @@
 </div>
 
 <script>
-// Read stations from the JSON data island (avoids Jinja inside <script>)
 var stations = JSON.parse(document.getElementById('stations-data').textContent);
 
-var stopCount = 0;
-var numBlocked = false;
-var nameBlocked = false;
+var stationMap = {};
+for (var i = 0; i < stations.length; i++) {
+  stationMap[stations[i].station_id] = stations[i];
+}
+
+var stopCount    = 0;
+var numBlocked   = false;
+var nameBlocked  = false;
 var numTimer, nameTimer;
 
-// ── Duplicate check ────────────────────────────────────────────────
+// Cache: "fromSid_toSid" → travel minutes
+var _travelCache = {};
+
+// ── Duplicate check ────────────────────────────────────────────────────
 function checkDuplicate(input, type) {
-  var val = input.value.trim();
+  var val    = input.value.trim();
   var warnEl = document.getElementById(type === 'num' ? 'num-warn' : 'name-warn');
   if (!val) { warnEl.classList.remove('show'); warnEl.textContent = ''; return; }
 
   if (type === 'num') { clearTimeout(numTimer); }
-  else { clearTimeout(nameTimer); }
+  else                { clearTimeout(nameTimer); }
 
   var timer = setTimeout(function() {
     fetch('/admin/api/check-train-duplicate?type=' + type + '&value=' + encodeURIComponent(val))
@@ -132,186 +157,294 @@ function checkDuplicate(input, type) {
           warnEl.textContent = '\u26a0 ' + data.message;
           warnEl.classList.add('show');
           warnEl.style.color = 'var(--red)';
-          if (type === 'num') { numBlocked = true; }
-          else { nameBlocked = true; }
+          if (type === 'num') { numBlocked = true; } else { nameBlocked = true; }
         } else {
           warnEl.textContent = '\u2713 Available';
           warnEl.classList.add('show');
           warnEl.style.color = 'var(--green)';
-          if (type === 'num') { numBlocked = false; }
-          else { nameBlocked = false; }
+          if (type === 'num') { numBlocked = false; } else { nameBlocked = false; }
         }
       });
   }, 450);
 
-  if (type === 'num') { numTimer = timer; }
-  else { nameTimer = timer; }
+  if (type === 'num') { numTimer = timer; } else { nameTimer = timer; }
 }
 
-// ── Stop management ────────────────────────────────────────────────
+// ── Build select options ───────────────────────────────────────────────
+function buildOptions(preselectedId) {
+  var html = '<option value="">— Select Station —</option>';
+  for (var i = 0; i < stations.length; i++) {
+    var s   = stations[i];
+    var sel = (preselectedId && String(s.station_id) === String(preselectedId)) ? ' selected' : '';
+    html += '<option value="' + s.station_id + '"' + sel + '>' + s.station_name + ' (' + s.city + ')</option>';
+  }
+  return html;
+}
+
+// ── Add a stop row ─────────────────────────────────────────────────────
 function addStop(preselectedId, preArrival, preDeparture) {
   stopCount++;
-  var idx = stopCount;
-  var div = document.createElement('div');
-  div.className = 'stop-row';
-  div.id = 'stop-' + idx;
+  var idx     = stopCount;
+  var isFirst = (document.querySelectorAll('#stops-container .stop-row').length === 0);
 
-  var labelStation = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Station</label>' : '';
-  var labelArrival = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Arrival</label>' : '';
-  var labelDepart  = idx === 1 ? '<label style="font-size:11px;color:var(--muted)">Departure</label>' : '';
-
-  var options = '<option value="">Select station</option>';
-  for (var i = 0; i < stations.length; i++) {
-    var s = stations[i];
-    var sel = (preselectedId && String(s.station_id) === String(preselectedId)) ? ' selected' : '';
-    options += '<option value="' + s.station_id + '"' + sel + '>' + s.station_name + ' (' + s.city + ')</option>';
+  // Pre-compute waiting time from existing arrival/departure
+  var preWaitH = '', preWaitM = '';
+  if (preArrival && preDeparture) {
+    var aP   = preArrival.split(':'), dP = preDeparture.split(':');
+    var diff = (parseInt(dP[0])*60 + parseInt(dP[1])) - (parseInt(aP[0])*60 + parseInt(aP[1]));
+    if (diff < 0) diff += 24 * 60;
+    if (diff > 0) { preWaitH = String(Math.floor(diff/60)); preWaitM = String(diff % 60); }
   }
+
+  var div = document.createElement('div');
+  div.className   = 'stop-row';
+  div.id          = 'stop-' + idx;
+  div.dataset.idx = idx;
 
   div.innerHTML =
-    '<span class="stop-num">Stop ' + idx + '</span>' +
-    '<div class="form-group" style="margin-bottom:0">' +
-      labelStation +
-      '<select name="stop_station_id" required onchange="validateStopSelect(this,' + idx + ')">' +
-        options +
-      '</select>' +
-      '<div class="stop-hint" id="hint-' + idx + '"></div>' +
-    '</div>' +
-    '<div class="form-group" style="margin-bottom:0">' +
-      labelArrival +
-      '<input type="time" name="arrival_time" value="' + (preArrival || '') + '">' +
-    '</div>' +
-    '<div class="form-group" style="margin-bottom:0">' +
-      labelDepart +
-      '<input type="time" name="departure_time" value="' + (preDeparture || '') + '">' +
-    '</div>' +
-    '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm" style="margin-bottom:0">\u2715</button>';
+    '<span class="stop-badge">STOP ' + idx + '</span>' +
+    '<div class="stop-grid">' +
+
+      // Station
+      '<div class="form-group" style="margin-bottom:0">' +
+        '<select name="stop_station_id" required onchange="onStopChange(this,' + idx + ')">' +
+          buildOptions(preselectedId) +
+        '</select>' +
+        '<div class="validation-msg" id="vmsg-' + idx + '"></div>' +
+      '</div>' +
+
+      // Arrival
+      '<div class="form-group" style="margin-bottom:0">' +
+        '<input type="time" name="arrival_time" id="arr-' + idx + '" value="' + (preArrival || '') + '"' +
+          (isFirst ? '' : ' readonly') +
+          ' onchange="onArrivalChange(' + idx + ')">' +
+        '<div style="font-size:9px;color:var(--muted);margin-top:3px" id="arr-label-' + idx + '">' +
+          (isFirst ? 'Set manually' : 'Auto-calculated') +
+        '</div>' +
+      '</div>' +
+
+      // Waiting time
+      '<div class="form-group" style="margin-bottom:0">' +
+        '<div class="wait-row">' +
+          '<div>' +
+            '<input type="number" id="wait-h-' + idx + '" min="0" max="23" placeholder="0" value="' + preWaitH + '"' +
+              ' oninput="onWaitChange(' + idx + ')" onwheel="this.blur()">' +
+            '<div class="wait-label">HRS</div>' +
+          '</div>' +
+          '<div>' +
+            '<input type="number" id="wait-m-' + idx + '" min="0" max="59" placeholder="0" value="' + preWaitM + '"' +
+              ' oninput="onWaitChange(' + idx + ')" onwheel="this.blur()">' +
+            '<div class="wait-label">MIN</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      // Departure (readonly, auto-calculated)
+      '<div class="form-group" style="margin-bottom:0">' +
+        '<input type="time" name="departure_time" id="dep-' + idx + '" value="' + (preDeparture || '') + '" readonly>' +
+        '<div style="font-size:9px;color:var(--green);margin-top:3px">Arrival + wait</div>' +
+      '</div>' +
+
+      // Remove
+      '<button type="button" onclick="removeStop(' + idx + ')" class="btn btn-danger btn-sm"' +
+        ' style="margin-bottom:0" title="Remove">&#x2715;</button>' +
+
+    '</div>';
 
   document.getElementById('stops-container').appendChild(div);
-  renumberStops();
+  document.getElementById('col-headers').style.display = 'grid';
 
-  if (preselectedId) {
-    validateStopSelect(div.querySelector('select'), idx);
-  }
+  if (preselectedId) onStopChange(div.querySelector('select'), idx);
+  if (preArrival && (preWaitH || preWaitM)) onWaitChange(idx);
+
+  updateCounter();
 }
 
+// ── Remove ─────────────────────────────────────────────────────────────
 function removeStop(id) {
   var el = document.getElementById('stop-' + id);
-  if (el) { el.remove(); }
+  if (el) el.remove();
   renumberStops();
+  updateCounter();
+  if (!document.querySelectorAll('#stops-container .stop-row').length)
+    document.getElementById('col-headers').style.display = 'none';
 }
 
 function renumberStops() {
   var rows = document.querySelectorAll('#stops-container .stop-row');
   for (var i = 0; i < rows.length; i++) {
-    var numEl = rows[i].querySelector('.stop-num');
-    if (numEl) { numEl.textContent = 'Stop ' + (i + 1); }
+    var b = rows[i].querySelector('.stop-badge');
+    if (b) b.textContent = 'STOP ' + (i + 1);
   }
 }
 
-function validateStopSelect(select, idx) {
-  var hint = document.getElementById('hint-' + idx);
-  var stationId = parseInt(select.value);
-  if (!stationId) {
-    hint.textContent = '';
-    hint.className = 'stop-hint';
-    select.classList.remove('valid-stop', 'invalid-stop');
-    return;
-  }
-  var found = null;
-  for (var i = 0; i < stations.length; i++) {
-    if (stations[i].station_id === stationId) { found = stations[i]; break; }
-  }
-  if (found) {
-    hint.textContent = '\u2713 ' + found.station_name + ', ' + found.city;
-    hint.className = 'stop-hint ok';
-    select.classList.remove('invalid-stop');
-    select.classList.add('valid-stop');
-    
-    // Auto-calculate time based on previous stop
-    calculateTimeForStop(select, stationId);
-  } else {
-    hint.textContent = '\u2717 Station not found in registry';
-    hint.className = 'stop-hint err';
-    select.classList.remove('valid-stop');
-    select.classList.add('invalid-stop');
+function updateCounter() {
+  var c = document.querySelectorAll('#stops-container .stop-row').length;
+  document.getElementById('stop-counter').textContent = c + ' stop' + (c !== 1 ? 's' : '');
+}
+
+// ── Core: recalculate departure for stop idx, then cascade forward ─────
+function onWaitChange(idx) {
+  var arr = document.getElementById('arr-' + idx);
+  var dep = document.getElementById('dep-' + idx);
+  var wH  = parseInt(document.getElementById('wait-h-' + idx).value) || 0;
+  var wM  = parseInt(document.getElementById('wait-m-' + idx).value) || 0;
+
+  if (!arr || !arr.value) return;
+
+  var p   = arr.value.split(':');
+  var tot = parseInt(p[0])*60 + parseInt(p[1]) + wH*60 + wM;
+  dep.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
+
+  cascadeFrom(idx);
+}
+
+// ── Manual arrival change (first stop only) ───────────────────────────
+function onArrivalChange(idx) {
+  onWaitChange(idx);
+}
+
+// ── Cascade: walk every stop after fromIdx and update arrival ──────────
+function cascadeFrom(fromIdx) {
+  var rows  = document.querySelectorAll('#stops-container .stop-row');
+  var myRow = document.getElementById('stop-' + fromIdx);
+  if (!myRow) return;
+  var start = Array.prototype.indexOf.call(rows, myRow);
+
+  for (var i = start + 1; i < rows.length; i++) {
+    var prev    = rows[i - 1];
+    var curr    = rows[i];
+    var pIdx    = parseInt(prev.dataset.idx);
+    var cIdx    = parseInt(curr.dataset.idx);
+    var prevDep = document.getElementById('dep-' + pIdx);
+    var currArr = document.getElementById('arr-' + cIdx);
+    if (!prevDep || !prevDep.value || !currArr) break;
+
+    var pSel = prev.querySelector('select[name="stop_station_id"]');
+    var cSel = curr.querySelector('select[name="stop_station_id"]');
+    var pSid = parseInt(pSel ? pSel.value : 0);
+    var cSid = parseInt(cSel ? cSel.value : 0);
+    if (!pSid || !cSid) break;
+
+    var key = pSid + '_' + cSid;
+    if (_travelCache[key] !== undefined) {
+      var p2  = prevDep.value.split(':');
+      var tot = parseInt(p2[0])*60 + parseInt(p2[1]) + _travelCache[key];
+      currArr.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
+      onWaitChange(cIdx);
+    } else {
+      fetchTravelTime(pSid, cSid, prevDep.value, cIdx);
+      break;
+    }
   }
 }
 
-function calculateTimeForStop(selectElement, currentStationId) {
-  var currentRow = selectElement.closest('.stop-row');
-  var prevRow = currentRow.previousElementSibling;
-  if (!prevRow || !prevRow.classList.contains('stop-row')) return;
-  
-  var prevSelect = prevRow.querySelector('select[name="stop_station_id"]');
-  var prevDepartInput = prevRow.querySelector('input[name="departure_time"]');
-  if (!prevSelect || !prevDepartInput) return;
-  
-  var prevStationId = parseInt(prevSelect.value);
-  var prevDepartTime = prevDepartInput.value;
-  if (!prevStationId || !prevDepartTime) return; // need previous values to calculate
-  
-  var currentArrivalInput = currentRow.querySelector('input[name="arrival_time"]');
-  var currentDepartInput = currentRow.querySelector('input[name="departure_time"]');
-  if (!currentArrivalInput || !currentDepartInput) return;
-  
-  // Do not overwrite existing values to allow users to edit them
-  if (currentArrivalInput.value && currentDepartInput.value) return;
+// ── Fetch travel time from API ─────────────────────────────────────────
+function fetchTravelTime(fromId, toId, depTime, targetIdx) {
+  var arrInput = document.getElementById('arr-' + targetIdx);
+  var row      = document.getElementById('stop-' + targetIdx);
+  var msg      = document.getElementById('vmsg-' + targetIdx);
 
-  var hint = currentRow.querySelector('.stop-hint');
-  var baseHint = hint ? hint.textContent : '';
-  if (hint) {
-      hint.textContent = '\u231B Calculating distance & time...';
-      hint.classList.remove('ok');
-      hint.style.color = 'var(--amber)';
-  }
+  if (row) row.classList.add('calculating');
+  if (msg) { msg.textContent = '⏳ Calculating distance…'; msg.className = 'validation-msg calc'; }
 
-  fetch('/admin/api/calculate-journey?from_id=' + prevStationId + '&to_id=' + currentStationId)
+  fetch('/admin/api/calculate-journey?from_id=' + fromId + '&to_id=' + toId)
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      if (row) row.classList.remove('calculating');
       if (data.estimated_minutes && !data.error) {
-        var parts = prevDepartTime.split(':');
-        var date = new Date(2000, 0, 1, parseInt(parts[0]), parseInt(parts[1]));
-        
-        // calculate arrival
-        date.setMinutes(date.getMinutes() + data.estimated_minutes);
-        var arrHH = String(date.getHours()).padStart(2, '0');
-        var arrMM = String(date.getMinutes()).padStart(2, '0');
-        if (!currentArrivalInput.value) { currentArrivalInput.value = arrHH + ':' + arrMM; }
-        
-        // calculate departure (arrival + 10 mins approx)
-        date.setMinutes(date.getMinutes() + 10);
-        var depHH = String(date.getHours()).padStart(2, '0');
-        var depMM = String(date.getMinutes()).padStart(2, '0');
-        if (!currentDepartInput.value) { currentDepartInput.value = depHH + ':' + depMM; }
-        
-        if (hint) {
-            var prefixFree = baseHint.replace(/^[\u2713\u2717]\s*/, '');
-            hint.textContent = '\u2713 ' + prefixFree + ' (' + data.distance_km + ' km track)';
-            hint.classList.add('ok');
-            hint.style.color = '';
+        _travelCache[fromId + '_' + toId] = data.estimated_minutes;
+
+        var p   = depTime.split(':');
+        var tot = parseInt(p[0])*60 + parseInt(p[1]) + data.estimated_minutes;
+        arrInput.value = pad(Math.floor(tot/60) % 24) + ':' + pad(tot % 60);
+
+        if (msg) {
+          var st = stationMap[toId];
+          msg.textContent = '✓ ' + (st ? st.station_name : '') +
+            ' · ' + data.distance_km + ' km · ~' + data.estimated_minutes + ' min travel';
+          msg.className = 'validation-msg ok';
         }
+        onWaitChange(targetIdx);
       } else {
-        if (hint) { hint.textContent = baseHint; hint.classList.add('ok'); hint.style.color = ''; }
+        if (msg) msg.className = 'validation-msg warn';
       }
     })
-    .catch(function() { 
-        if (hint) { hint.textContent = baseHint; hint.classList.add('ok'); hint.style.color = ''; }
+    .catch(function() {
+      if (row) row.classList.remove('calculating');
     });
 }
 
+// ── Station dropdown change ────────────────────────────────────────────
+function onStopChange(select, idx) {
+  var stationId = parseInt(select.value, 10);
+  var row = document.getElementById('stop-' + idx);
+  var msg = document.getElementById('vmsg-' + idx);
+
+  if (!stationId) {
+    msg.textContent = ''; msg.className = 'validation-msg';
+    row.classList.remove('validated', 'unresolved', 'calculating');
+    return;
+  }
+
+  var found = stationMap[stationId];
+  if (!found) {
+    msg.textContent = '✗ Station not in registry';
+    msg.className = 'validation-msg warn';
+    row.classList.add('unresolved'); row.classList.remove('validated');
+    return;
+  }
+
+  msg.textContent = '✓ ' + found.station_name + ', ' + found.city;
+  msg.className = 'validation-msg ok';
+  row.classList.add('validated'); row.classList.remove('unresolved');
+
+  var rows    = document.querySelectorAll('#stops-container .stop-row');
+  var myIndex = Array.prototype.indexOf.call(rows, row);
+
+  if (myIndex === 0) {
+    var arrInput = document.getElementById('arr-' + idx);
+    if (arrInput) arrInput.removeAttribute('readonly');
+    document.getElementById('arr-label-' + idx).textContent = 'Set manually';
+    return;
+  }
+
+  var prevRow    = rows[myIndex - 1];
+  var prevIdx    = parseInt(prevRow.dataset.idx);
+  var prevSelect = prevRow.querySelector('select[name="stop_station_id"]');
+  var prevDep    = document.getElementById('dep-' + prevIdx);
+
+  if (!prevSelect || !prevSelect.value || !prevDep || !prevDep.value) {
+    msg.textContent += ' · set previous stop departure first';
+    return;
+  }
+
+  document.getElementById('arr-' + idx).value = '';
+  fetchTravelTime(parseInt(prevSelect.value), stationId, prevDep.value, idx);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function pad(n) { return String(n).padStart(2, '0'); }
+
+// ── Form validation ────────────────────────────────────────────────────
 function validateForm() {
   if (numBlocked || nameBlocked) {
     alert('Please fix duplicate train number / name issues before saving.');
     return false;
   }
-  var selects = document.querySelectorAll('#stops-container select[name="stop_station_id"]');
-  if (selects.length === 0) {
+  var rows = document.querySelectorAll('#stops-container .stop-row');
+  if (!rows.length) {
     alert('Please add at least one route stop.');
     return false;
   }
-  for (var i = 0; i < selects.length; i++) {
-    if (!selects[i].value) {
-      alert('Please select a valid station for every stop.');
+  for (var i = 0; i < rows.length; i++) {
+    var sel = rows[i].querySelector('select[name="stop_station_id"]');
+    if (!sel || !sel.value) {
+      alert('Stop ' + (i + 1) + ': Please select a station.');
+      return false;
+    }
+    if (!stationMap[parseInt(sel.value)]) {
+      alert('Stop ' + (i + 1) + ': Station not in registry.');
       return false;
     }
   }

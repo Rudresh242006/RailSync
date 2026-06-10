@@ -76,9 +76,11 @@
             {% else %}<span class="badge badge-red">Cancelled</span>{% endif %}
           </td>
           <td>
+            {% if b.status != 'CANCELLED' %}
             <a href="{{ url_for('user.track', train_id=b.train_id) }}" class="btn btn-ghost btn-sm">
               📍 Track
             </a>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

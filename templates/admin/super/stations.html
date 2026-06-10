@@ -21,6 +21,54 @@
     padding-left: 36px;
     max-width: 320px;
   }
+
+  /* ── Platform Modal ── */
+  .pm-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .pm-overlay.open { display: flex; }
+  .pm-modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 28px;
+    width: 480px;
+    max-width: 96vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    animation: pmSlide .18s ease;
+  }
+  @keyframes pmSlide { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .pm-close {
+    position: absolute; top: 16px; right: 16px;
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 18px; line-height: 1;
+    padding: 4px 8px; border-radius: 6px;
+    transition: background .15s;
+  }
+  .pm-close:hover { background: var(--bg3); color: var(--text); }
+  .pm-platform-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: var(--bg3);
+    transition: border-color .2s;
+  }
+  .pm-platform-row:hover { border-color: var(--border2); }
+  .pm-add-row {
+    display: flex; gap: 8px; margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .pm-add-row input { flex: 1; }
 </style>
 {% endblock %}
 
@@ -49,7 +97,7 @@
             <th>ID</th>
             <th>Station Name</th>
             <th>Location</th>
-            <th>Platforms Conf.</th>
+            <th>Platforms</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -64,15 +112,25 @@
             </td>
             <td>
               {% if s.platforms %}
-              <span class="badge badge-green">{{ s.platforms|length }} Platforms</span>
+              <span class="badge badge-green" id="plat-badge-{{ s.station_id }}">{{ s.platforms|length }} Platform{% if s.platforms|length != 1 %}s{% endif %}</span>
               {% else %}
-              <span class="badge badge-amber">None</span>
+              <span class="badge badge-amber" id="plat-badge-{{ s.station_id }}">None</span>
               {% endif %}
             </td>
             <td>
-              <form method="POST" action="{{ url_for('admin.remove_station', station_id=s.station_id) }}" onsubmit="return confirm('WARNING: Are you sure you want to delete this station? This might fail if there are existing bookings linked to it.');">
-                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
-              </form>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <!-- Manage Platforms -->
+                <button class="btn btn-ghost btn-sm"
+                        onclick="openPlatformModal({{ s.station_id }}, '{{ s.station_name|e }}')"
+                        title="Manage Platforms">
+                  🏗 Platforms
+                </button>
+                <!-- Remove Station -->
+                <form method="POST" action="{{ url_for('admin.remove_station', station_id=s.station_id) }}"
+                      onsubmit="return confirm('WARNING: Are you sure you want to delete this station? This might fail if there are existing bookings linked to it.');">
+                  <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                </form>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -114,7 +172,173 @@
   
 </div>
 
+<!-- ── Platform Management Modal ──────────────────────────────── -->
+<div class="pm-overlay" id="pm-overlay" onclick="closePlatformModal(event)">
+  <div class="pm-modal">
+    <button class="pm-close" onclick="closePlatformModal(null)">&times;</button>
+
+    <div style="margin-bottom:20px">
+      <div style="font-size:18px;font-weight:800" id="pm-title">Platforms</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px" id="pm-subtitle">Loading…</div>
+    </div>
+
+    <div id="pm-list">
+      <div style="text-align:center;color:var(--muted);padding:20px">Loading platforms…</div>
+    </div>
+
+    <!-- Add platform row -->
+    <div class="pm-add-row">
+      <input type="text" id="pm-new-num" placeholder="Platform number (e.g. 1, 2A, 3B)" maxlength="10"
+             onkeydown="if(event.key==='Enter') addPlatform()">
+      <button class="btn btn-primary btn-sm" onclick="addPlatform()" id="pm-add-btn">+ Add</button>
+    </div>
+    <div id="pm-msg" style="font-size:12px;margin-top:8px;display:none"></div>
+  </div>
+</div>
+
 <script>
+var _pmStationId   = null;
+var _pmStationName = '';
+
+function openPlatformModal(stationId, stationName) {
+  _pmStationId   = stationId;
+  _pmStationName = stationName;
+  document.getElementById('pm-title').textContent    = stationName + ' — Platforms';
+  document.getElementById('pm-subtitle').textContent = 'Add or remove platforms for this station';
+  document.getElementById('pm-overlay').classList.add('open');
+  document.getElementById('pm-new-num').value = '';
+  hideMsg();
+  loadPlatforms();
+}
+
+function closePlatformModal(evt) {
+  if (evt && evt.target !== document.getElementById('pm-overlay')) return;
+  document.getElementById('pm-overlay').classList.remove('open');
+}
+
+function loadPlatforms() {
+  var list = document.getElementById('pm-list');
+  list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">Loading…</div>';
+
+  fetch('/admin/super/stations/' + _pmStationId + '/platforms')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      renderPlatforms(data.platforms);
+      // Update badge in table
+      updateBadge(_pmStationId, data.platforms.length);
+    })
+    .catch(function() {
+      list.innerHTML = '<div style="color:var(--danger);padding:12px">Failed to load platforms.</div>';
+    });
+}
+
+function renderPlatforms(platforms) {
+  var list = document.getElementById('pm-list');
+  if (!platforms.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">' +
+      '<div style="font-size:28px;margin-bottom:8px">🏗</div>' +
+      '<div style="font-weight:600">No platforms yet</div>' +
+      '<div style="font-size:12px;margin-top:4px">Add the first platform below.</div>' +
+      '</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < platforms.length; i++) {
+    var p = platforms[i];
+    html += '<div class="pm-platform-row" id="pm-row-' + p.platform_id + '">' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="width:36px;height:36px;border-radius:8px;background:rgba(99,102,241,0.12);' +
+          'display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:var(--accent)">' +
+          p.platform_number + '</div>' +
+        '<div>' +
+          '<div style="font-weight:600">Platform ' + p.platform_number + '</div>' +
+          '<div style="font-size:11px;color:' + (p.is_available ? 'var(--green)' : 'var(--amber)') + '">' +
+            (p.is_available ? '● Available' : '● Occupied') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-danger btn-sm" onclick="removePlatform(' + p.platform_id + ', \'' + p.platform_number + '\')">' +
+        '✕ Remove' +
+      '</button>' +
+    '</div>';
+  }
+  list.innerHTML = html;
+}
+
+function addPlatform() {
+  var num = document.getElementById('pm-new-num').value.trim();
+  if (!num) { showMsg('Please enter a platform number.', false); return; }
+
+  var btn = document.getElementById('pm-add-btn');
+  btn.disabled = true;
+
+  var formData = new FormData();
+  formData.append('platform_number', num);
+
+  fetch('/admin/super/stations/' + _pmStationId + '/platforms/add', {
+    method: 'POST',
+    body: formData
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    if (data.ok) {
+      document.getElementById('pm-new-num').value = '';
+      showMsg('Platform ' + num + ' added!', true);
+      loadPlatforms();
+    } else {
+      showMsg(data.error || 'Failed to add platform.', false);
+    }
+  })
+  .catch(function() {
+    btn.disabled = false;
+    showMsg('Network error. Please try again.', false);
+  });
+}
+
+function removePlatform(platformId, platformNum) {
+  if (!confirm('Remove Platform ' + platformNum + '? Any allocations will also be deleted.')) return;
+
+  fetch('/admin/super/stations/' + _pmStationId + '/platforms/remove/' + platformId, {
+    method: 'POST'
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      showMsg('Platform ' + platformNum + ' removed.', true);
+      loadPlatforms();
+    } else {
+      showMsg('Failed to remove platform.', false);
+    }
+  })
+  .catch(function() { showMsg('Network error.', false); });
+}
+
+function updateBadge(stationId, count) {
+  var badge = document.getElementById('plat-badge-' + stationId);
+  if (!badge) return;
+  if (count === 0) {
+    badge.textContent = 'None';
+    badge.className = 'badge badge-amber';
+  } else {
+    badge.textContent = count + ' Platform' + (count !== 1 ? 's' : '');
+    badge.className = 'badge badge-green';
+  }
+}
+
+function showMsg(text, ok) {
+  var el = document.getElementById('pm-msg');
+  el.textContent = text;
+  el.style.color = ok ? 'var(--green)' : 'var(--danger)';
+  el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, 3000);
+}
+function hideMsg() { document.getElementById('pm-msg').style.display = 'none'; }
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closePlatformModal(null);
+});
+
 function filterStations() {
   const query = document.getElementById('station-search').value.toLowerCase();
   const rows = document.getElementById('stations-body').querySelectorAll('tr');

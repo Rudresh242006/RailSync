@@ -1,13 +1,13 @@
 import smtplib
-import random
+import secrets
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
 def generate_otp() -> str:
-    """Generate a secure 6-digit OTP."""
-    return str(random.randint(100000, 999999))
+    """Generate a cryptographically secure 6-digit OTP."""
+    return str(secrets.randbelow(900000) + 100000)
 
 
 def send_otp_email(to_email: str, name: str, otp: str) -> bool:

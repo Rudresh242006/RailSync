@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from extensions import db, bcrypt
-from models import User, StationMaster
+from models import User, StationMaster, TrainDriver
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -23,31 +23,12 @@ def index():
             return redirect(url_for('admin.super_dashboard'))
         if current_user.role == 'admin':
             return redirect(url_for('admin.dashboard'))
+        if getattr(current_user, 'role', None) == 'driver':
+            return redirect(url_for('driver.dashboard'))
         return redirect(url_for('user.dashboard'))
     return render_template('index.html')
 
 
-@auth_bp.route('/create_admin')
-def create_admin():
-    name = "Admin"
-    email = "admin@gmail.com"
-    phone = "9999999999"
-    password = "admin123"
-
-    hashed = bcrypt.generate_password_hash(password).decode('utf-8')
-
-    admin = StationMaster(
-        name=name,
-        email=email,
-        phone=phone,
-        password_hash=hashed,
-        station_id=1
-    )
-
-    db.session.add(admin)
-    db.session.commit()
-
-    return "Admin created"
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -77,28 +58,41 @@ def admin_login():
         password = request.form.get('password', '')
         selected_role = request.form.get('role', 'admin')
 
-        master = StationMaster.query.filter_by(email=email).first()
-
-        try:
-            pw_ok = master and bcrypt.check_password_hash(master.password_hash, password)
-        except ValueError:
-            pw_ok = False
-            flash('Admin account has a corrupted password hash. Please contact the system administrator.', 'danger')
-
-        if pw_ok:
-            if selected_role == 'super_admin' and not master.is_super_admin:
-                flash('You do not have Super Admin privileges.', 'danger')
-                return redirect(url_for('auth.admin_login', role='super_admin'))
-
-            login_user(master)
-            flash('Welcome back, Station Master!', 'success')
-            if master.role == 'super_admin':
-                return redirect(url_for('admin.super_dashboard'))
-            return redirect(url_for('admin.dashboard'))
-        elif not pw_ok and master:
-            pass
+        if selected_role == 'driver':
+            driver = TrainDriver.query.filter_by(email=email).first()
+            try:
+                pw_ok = driver and bcrypt.check_password_hash(driver.password_hash, password)
+            except ValueError:
+                pw_ok = False
+                flash('Driver account has a corrupted password hash. Please contact the system administrator.', 'danger')
+            
+            if pw_ok:
+                login_user(driver)
+                flash(f'Welcome back, {driver.name}!', 'success')
+                return redirect(url_for('driver.dashboard'))
+            else:
+                flash('Invalid driver credentials.', 'danger')
         else:
-            flash('Invalid admin credentials.', 'danger')
+            master = StationMaster.query.filter_by(email=email).first()
+
+            try:
+                pw_ok = master and bcrypt.check_password_hash(master.password_hash, password)
+            except ValueError:
+                pw_ok = False
+                flash('Admin account has a corrupted password hash. Please contact the system administrator.', 'danger')
+
+            if pw_ok:
+                if selected_role == 'super_admin' and not master.is_super_admin:
+                    flash('You do not have Super Admin privileges.', 'danger')
+                    return redirect(url_for('auth.admin_login', role='super_admin'))
+
+                login_user(master)
+                flash('Welcome back, Station Master!', 'success')
+                if master.role == 'super_admin':
+                    return redirect(url_for('admin.super_dashboard'))
+                return redirect(url_for('admin.dashboard'))
+            else:
+                flash('Invalid admin credentials.', 'danger')
 
     return render_template('master_login.html')
 
@@ -316,6 +310,13 @@ def forgot_password():
 @auth_bp.route('/logout')
 @login_required
 def logout():
+    role = getattr(current_user, 'role', 'user')
     logout_user()
     flash('You have been logged out.', 'info')
+    
+    if role == 'driver':
+        return redirect(url_for('auth.admin_login', role='driver'))
+    elif role in ['admin', 'super_admin']:
+        return redirect(url_for('auth.admin_login'))
+        
     return redirect(url_for('auth.login'))
