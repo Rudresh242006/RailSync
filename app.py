@@ -8,7 +8,7 @@ from flask_compress import Compress
 import os
 from dotenv import load_dotenv
 load_dotenv()
-from extensions import db, bcrypt, login_manager, socketio
+from extensions import db, bcrypt, login_manager, socketio, csrf, limiter
 
 def create_app():
     app = Flask(__name__)
@@ -25,7 +25,14 @@ def create_app():
 
     db.init_app(app)
     bcrypt.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*")
+    csrf.init_app(app)
+    limiter.init_app(app)
+
+    # Restrict SocketIO CORS origins
+    allowed_origins_env = os.environ.get('ALLOWED_ORIGIN', 'http://localhost:5000,http://127.0.0.1:5000')
+    allowed_origins = [o.strip() for o in allowed_origins_env.split(',') if o.strip()]
+    socketio.init_app(app, cors_allowed_origins=allowed_origins)
+
 
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'

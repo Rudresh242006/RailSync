@@ -111,7 +111,9 @@
   <!-- Expandable booking form -->
   <div id="book-form-{{ t.train.train_id }}" style="display:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
     <form method="POST" action="{{ url_for('user.book') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="train_id" value="{{ t.train.train_id }}">
+
       <input type="hidden" name="source_station_id" value="{{ t.src_id }}">
       <input type="hidden" name="destination_station_id" value="{{ t.dst_id }}">
       <input type="hidden" name="journey_date" value="{{ t.journey_date }}">

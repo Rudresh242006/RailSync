@@ -26,12 +26,24 @@ def train_status(train_id):
         'platform': alloc.platform.platform_number if alloc and alloc.platform else None
     })
 
-@api_bp.route('/allocate', methods=['POST'])
-def allocate():
-    data = request.json
+from functools import wraps
 
+def admin_api_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or getattr(current_user, 'role', None) not in ['admin', 'super_admin']:
+            return jsonify({'error': 'Admin authorization required'}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+@api_bp.route('/allocate', methods=['POST'])
+@login_required
+@admin_api_required
+def allocate():
+    data = request.get_json() or {}
     result = allocate_platform(data)
     return jsonify(result)
+
 
 @api_bp.route('/notifications/unread-count')
 @login_required

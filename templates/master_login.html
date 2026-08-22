@@ -292,7 +292,9 @@
   </div>
 
   <form method="POST" action="{{ url_for('auth.admin_login') }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="role" id="role-input" value="{{ request.args.get('role', 'admin') }}">
+
     
     <div class="form-group stagger-2">
       <label><i class="fa-solid fa-envelope"></i> Staff Email</label>

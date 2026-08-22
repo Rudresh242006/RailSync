@@ -1,9 +1,27 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, make_response
 from flask_login import login_user, logout_user, login_required, current_user
-from extensions import db, bcrypt
+from extensions import db, bcrypt, limiter
 from models import User, StationMaster, TrainDriver
+import secrets
+import time
 
 auth_bp = Blueprint('auth', __name__)
+
+# In-memory server-side storage for registration and forgot-password flows
+# (Never store password hashes or OTPs in client-side cookies)
+_PENDING_REGISTRATIONS = {}
+_PENDING_FORGOT_PW = {}
+
+
+def _cleanup_expired_pending():
+    """Remove expired entries from server-side memory."""
+    now = time.time()
+    for token in list(_PENDING_REGISTRATIONS.keys()):
+        if _PENDING_REGISTRATIONS[token].get('otp_expires', 0) < now:
+            _PENDING_REGISTRATIONS.pop(token, None)
+    for token in list(_PENDING_FORGOT_PW.keys()):
+        if _PENDING_FORGOT_PW[token].get('otp_expires', 0) < now:
+            _PENDING_FORGOT_PW.pop(token, None)
 
 
 @auth_bp.after_request
@@ -29,9 +47,8 @@ def index():
     return render_template('index.html')
 
 
-
-
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5/minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
@@ -50,6 +67,7 @@ def login():
 
 
 @auth_bp.route('/admin_login', methods=['GET', 'POST'])
+@limiter.limit("5/minute")
 def admin_login():
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
@@ -120,10 +138,12 @@ def register():
             return redirect(url_for('auth.login'))
 
         from services.email_service import generate_otp, send_otp_email
-        import time
+
+        _cleanup_expired_pending()
 
         otp = generate_otp()
-        session['pending_registration'] = {
+        reg_token = secrets.token_urlsafe(32)
+        _PENDING_REGISTRATIONS[reg_token] = {
             'name':          name,
             'email':         email,
             'phone':         phone,
@@ -132,9 +152,12 @@ def register():
             'otp_expires':   time.time() + 600,   # 10 minutes
             'attempts':      0,
         }
+        session['reg_token'] = reg_token
 
         sent = send_otp_email(email, name, otp)
         if not sent:
+            _PENDING_REGISTRATIONS.pop(reg_token, None)
+            session.pop('reg_token', None)
             flash('Could not send verification email. Please try again.', 'danger')
             return render_template('register.html')
 
@@ -145,17 +168,17 @@ def register():
 
 
 @auth_bp.route('/verify-otp', methods=['GET', 'POST'])
+@limiter.limit("5/minute")
 def verify_otp():
     """OTP confirmation step — activated after registration form submission."""
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
 
-    pending = session.get('pending_registration')
+    reg_token = session.get('reg_token')
+    pending = _PENDING_REGISTRATIONS.get(reg_token) if reg_token else None
     if not pending:
         flash('Session expired. Please register again.', 'warning')
         return redirect(url_for('auth.register'))
-
-    import time
 
     if request.method == 'POST':
         action = request.form.get('action', 'verify')
@@ -167,7 +190,7 @@ def verify_otp():
             pending['otp']         = new_otp
             pending['otp_expires'] = time.time() + 600
             pending['attempts']    = 0
-            session['pending_registration'] = pending
+            _PENDING_REGISTRATIONS[reg_token] = pending
             send_otp_email(pending['email'], pending['name'], new_otp)
             flash('A new verification code has been sent.', 'info')
             return redirect(url_for('auth.verify_otp'))
@@ -176,12 +199,14 @@ def verify_otp():
         entered = request.form.get('otp', '').strip()
 
         if time.time() > pending.get('otp_expires', 0):
-            session.pop('pending_registration', None)
+            _PENDING_REGISTRATIONS.pop(reg_token, None)
+            session.pop('reg_token', None)
             flash('Your OTP has expired. Please register again.', 'danger')
             return redirect(url_for('auth.register'))
 
         if pending.get('attempts', 0) >= 5:
-            session.pop('pending_registration', None)
+            _PENDING_REGISTRATIONS.pop(reg_token, None)
+            session.pop('reg_token', None)
             flash('Too many incorrect attempts. Please register again.', 'danger')
             return redirect(url_for('auth.register'))
 
@@ -194,13 +219,14 @@ def verify_otp():
             )
             db.session.add(user)
             db.session.commit()
-            session.pop('pending_registration', None)
+            _PENDING_REGISTRATIONS.pop(reg_token, None)
+            session.pop('reg_token', None)
             login_user(user)
             flash(f'Welcome aboard, {user.name}! Your account is verified. 🎉', 'success')
             return redirect(url_for('user.dashboard'))
         else:
             pending['attempts'] = pending.get('attempts', 0) + 1
-            session['pending_registration'] = pending
+            _PENDING_REGISTRATIONS[reg_token] = pending
             remaining = 5 - pending['attempts']
             flash(f'Incorrect code. {remaining} attempt(s) remaining.', 'danger')
 
@@ -215,10 +241,13 @@ def verify_otp():
 
 
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit("5/minute")
 def forgot_password():
     """Step 1 — user enters email, OTP is sent."""
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
+
+    _cleanup_expired_pending()
 
     if request.method == 'POST':
         action = request.form.get('action', 'send')
@@ -232,15 +261,16 @@ def forgot_password():
                 return render_template('forgot_password.html', step='email')
 
             from services.email_service import generate_otp, send_otp_email
-            import time
             otp = generate_otp()
-            session['forgot_pw'] = {
+            fp_token = secrets.token_urlsafe(32)
+            _PENDING_FORGOT_PW[fp_token] = {
                 'email':       email,
                 'otp':         otp,
                 'otp_expires': time.time() + 600,
                 'attempts':    0,
                 'verified':    False,
             }
+            session['fp_token'] = fp_token
             send_otp_email(email, user.name, otp)
             flash(f'A verification code was sent to {email}.', 'info')
             return render_template('forgot_password.html', step='otp',
@@ -248,8 +278,8 @@ def forgot_password():
 
         # ── Step 2: verify OTP ────────────────────────────────────
         if action == 'verify':
-            import time
-            pending = session.get('forgot_pw')
+            fp_token = session.get('fp_token')
+            pending = _PENDING_FORGOT_PW.get(fp_token) if fp_token else None
             if not pending:
                 flash('Session expired. Please start again.', 'warning')
                 return redirect(url_for('auth.forgot_password'))
@@ -257,30 +287,33 @@ def forgot_password():
             entered = request.form.get('otp', '').strip()
 
             if time.time() > pending['otp_expires']:
-                session.pop('forgot_pw', None)
+                _PENDING_FORGOT_PW.pop(fp_token, None)
+                session.pop('fp_token', None)
                 flash('OTP expired. Please try again.', 'danger')
                 return redirect(url_for('auth.forgot_password'))
 
             if pending.get('attempts', 0) >= 5:
-                session.pop('forgot_pw', None)
+                _PENDING_FORGOT_PW.pop(fp_token, None)
+                session.pop('fp_token', None)
                 flash('Too many incorrect attempts. Please start again.', 'danger')
                 return redirect(url_for('auth.forgot_password'))
 
             if entered != pending['otp']:
                 pending['attempts'] = pending.get('attempts', 0) + 1
-                session['forgot_pw'] = pending
+                _PENDING_FORGOT_PW[fp_token] = pending
                 remaining = 5 - pending['attempts']
                 flash(f'Incorrect code. {remaining} attempt(s) remaining.', 'danger')
                 masked = pending['email'][:3] + '•••@' + pending['email'].split('@')[1]
                 return render_template('forgot_password.html', step='otp', masked_email=masked)
 
             pending['verified'] = True
-            session['forgot_pw'] = pending
+            _PENDING_FORGOT_PW[fp_token] = pending
             return render_template('forgot_password.html', step='reset')
 
         # ── Step 3: set new password ──────────────────────────────
         if action == 'reset':
-            pending = session.get('forgot_pw')
+            fp_token = session.get('fp_token')
+            pending = _PENDING_FORGOT_PW.get(fp_token) if fp_token else None
             if not pending or not pending.get('verified'):
                 flash('Session expired. Please start again.', 'warning')
                 return redirect(url_for('auth.forgot_password'))
@@ -300,7 +333,8 @@ def forgot_password():
                 user.password_hash = bcrypt.generate_password_hash(new_pw).decode('utf-8')
                 db.session.commit()
 
-            session.pop('forgot_pw', None)
+            _PENDING_FORGOT_PW.pop(fp_token, None)
+            session.pop('fp_token', None)
             flash('Password reset successfully. Please sign in.', 'success')
             return redirect(url_for('auth.login'))
 

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import anthropic
 import json
 import os
+import logging
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -51,13 +52,15 @@ def ai_reallocate_platform(delayed_train_id, delay_minutes, station_id, eta_fixe
     try:
         client = get_ai_client()
     except Exception as e:
+        logging.exception("Anthropic AI platform reallocation failed: %s", e)
         return {
             "action": "keep",
             "suggested_platform_id": None,
             "affected_trains": [],
-            "reasoning": f"AI unavailable: {str(e)}. Keeping current platform.",
+            "reasoning": "AI service unavailable. Keeping current platform.",
             "announcement": f"Train delayed by {delay_minutes} minutes. We apologize for the inconvenience."
         }
+
 
     delayed_train = Train.query.get(delayed_train_id)
     station = Station.query.get(station_id)
@@ -566,10 +569,15 @@ def clear_delay(train_id):
         flash('No delay record found for this train.', 'danger')
         return redirect(url_for('admin.report_delay'))
 
+    if current_user.role != 'super_admin' and status.current_station_id != current_user.station_id:
+        flash('You can only clear delays for trains currently at your station.', 'danger')
+        return redirect(url_for('admin.report_delay'))
+
     old_delay = status.delay_minutes
     status.delay_minutes = 0
     status.last_updated = datetime.utcnow()
     db.session.commit()
+
 
     # Notify passengers that the train is back on time
     train = Train.query.get(train_id)
@@ -980,7 +988,8 @@ def _lookup_station_coords(station_id, station_name, city):
                         db.session.rollback()
                 return coords
         except Exception as e:
-            print(f"[COORDS] Gemini API fallback failed: {e}")
+            logging.exception("Gemini API coordinate fallback failed: %s", e)
+
 
     print(f"[COORDS] FAILED all strategies for: {station_name}, {city}")
     _coord_failed.add(station_id)

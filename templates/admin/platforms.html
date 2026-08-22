@@ -32,6 +32,7 @@
           <form method="POST" action="{{ url_for('admin.delete_platform', platform_id=p.platform_id) }}"
                 onsubmit="return confirm('Delete Platform {{ p.platform_number }}? All allocations will also be removed.')"
                 style="margin-top:10px">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit"
               style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);
                      border-radius:7px;padding:4px 14px;font-size:12px;cursor:pointer;width:100%;
@@ -83,6 +84,7 @@
     <div class="card" style="margin-bottom:14px">
       <div class="card-title" style="margin-bottom:14px">Add Platform</div>
       <form method="POST" action="{{ url_for('admin.add_platform') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label>Platform Number</label>
           <input type="text" name="platform_number" placeholder="e.g. 1, 2A, 3B" required>
@@ -98,6 +100,8 @@
         Arrival &amp; departure times are auto-filled from the Super Admin schedule.
       </div>
       <form method="POST" action="{{ url_for('admin.allocate_platform') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
         <div class="form-group">
           <label>Train</label>
           <select name="train_id" required>

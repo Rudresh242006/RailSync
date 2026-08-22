@@ -118,7 +118,9 @@
   </div>
 
   <form method="POST" id="edit-stops-form" onsubmit="return validateAndSave()">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div id="stops-container"></div>
+
     <div style="display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
       {% if not is_locked %}
       <button type="submit" class="btn btn-primary">&#128190; Save Route &#8594;</button>

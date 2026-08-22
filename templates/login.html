@@ -270,7 +270,9 @@
   {% endwith %}
 
   <form method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="role" value="user">
+
     
     <div class="form-group stagger-1">
       <label><i class="fa-solid fa-envelope"></i> Email Address</label>

@@ -128,6 +128,7 @@
                 <!-- Remove Station -->
                 <form method="POST" action="{{ url_for('admin.remove_station', station_id=s.station_id) }}"
                       onsubmit="return confirm('WARNING: Are you sure you want to delete this station? This might fail if there are existing bookings linked to it.');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-danger btn-sm">Remove</button>
                 </form>
               </div>
@@ -150,6 +151,8 @@
       </div>
       
       <form method="POST" action="{{ url_for('admin.add_station') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
         <div class="form-group">
           <label>Station Name</label>
           <input type="text" name="station_name" required placeholder="Central Terminal">

@@ -1,7 +1,12 @@
 """
 One-time migration: add lat/lon to Station, scheduling fields to TrainStatus,
 then backfill coordinates from the existing lookup system.
+
+NOTE: [OFFLINE-ONLY SCRIPT]
+This script is intended exclusively for offline manual database maintenance.
+The hardcoded migrations list uses static, trusted table/column names only.
 """
+
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 

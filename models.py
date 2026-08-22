@@ -131,8 +131,9 @@ class TrainRoute(db.Model):
     __tablename__ = 'TrainRoute'
     route_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     train_id = db.Column(db.Integer, db.ForeignKey('Train.train_id', ondelete='CASCADE'), nullable=False)
-    station_id = db.Column(db.Integer, db.ForeignKey('Station.station_id', ondelete='CASCADE'), nullable=False)
+    station_id = db.Column(db.Integer, db.ForeignKey('Station.station_id', ondelete='CASCADE'), nullable=False, index=True)
     arrival_time = db.Column(db.Time, nullable=True)
+
     departure_time = db.Column(db.Time, nullable=True)
     stop_number = db.Column(db.Integer, nullable=False)
     distance_km = db.Column(db.Float, nullable=True)          # ← NEW: km from previous stop
@@ -247,8 +248,9 @@ class Booking(db.Model):
     source_station_id = db.Column(db.Integer, db.ForeignKey('Station.station_id'), nullable=False)
     destination_station_id = db.Column(db.Integer, db.ForeignKey('Station.station_id'), nullable=False)
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
-    journey_date = db.Column(db.Date, nullable=False)
+    journey_date = db.Column(db.Date, nullable=False, index=True)
     seat_number = db.Column(db.String(100), nullable=True)
+
     status = db.Column(db.Enum('CONFIRMED', 'WAITLISTED', 'CANCELLED'), default='CONFIRMED')
 
     __table_args__ = (db.UniqueConstraint('train_id', 'journey_date', 'seat_number', name='uq_train_date_seat'),)
@@ -292,8 +294,9 @@ class PlatformAllocation(db.Model):
 class Notification(db.Model):
     __tablename__ = 'Notification'
     notification_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('User.user_id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('User.user_id', ondelete='CASCADE'), nullable=False, index=True)
     train_id = db.Column(db.Integer, db.ForeignKey('Train.train_id', ondelete='CASCADE'), nullable=True)
+
     message = db.Column(db.Text, nullable=False)
     notif_type = db.Column(db.String(30), default='general')  # 'general', 'change_request', 'delay'
     extra_id = db.Column(db.Integer, nullable=True)            # e.g. PassengerChangeRequest.request_id

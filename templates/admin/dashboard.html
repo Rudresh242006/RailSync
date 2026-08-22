@@ -135,7 +135,9 @@
       This will add to its accumulated delay.
     </p>
     <form id="delayForm" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-group">
+
         <label>Delay Minutes (Add)</label>
         <input type="number" name="delay_minutes" min="1" max="1440" required placeholder="e.g. 15">
       </div>

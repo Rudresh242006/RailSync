@@ -11,7 +11,9 @@
       AI will analyse the situation and suggest platform reallocation automatically.
     </div>
     <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-group">
+
         <label>Affected Train</label>
         <select name="train_id" required>
           <option value="">Select train</option>
@@ -132,6 +134,7 @@
             </div>
             <form method="POST" action="{{ url_for('admin.clear_delay', train_id=t.train_id) }}"
                   onsubmit="return confirm('Clear the delay for {{ t.train_name }}? Passengers will be notified.')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-ghost btn-sm"
                       style="border-color:var(--green);color:var(--green)">
                 ✓ Clear Delay

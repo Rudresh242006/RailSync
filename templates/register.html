@@ -264,7 +264,9 @@
   {% endwith %}
 
   <form method="POST" action="{{ url_for('auth.register') }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group stagger-1">
+
       <label><i class="fa-solid fa-user"></i> Full Name</label>
       <input type="text" name="name" placeholder="Full Name" required maxlength="100" autocomplete="off">
     </div>

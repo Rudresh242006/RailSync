@@ -247,7 +247,9 @@
       Account: <strong style="color:var(--text)" id="modalName"></strong>
     </div>
     <form id="pwdForm" method="POST" action="{{ url_for('admin.change_password') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="user_type" id="modalType">
+
       <input type="hidden" name="target_id" id="modalId">
       <div class="form-group">
         <label for="newPwdInput">New Password</label>

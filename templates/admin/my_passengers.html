@@ -95,7 +95,9 @@
     </div>
 
     <form id="change-form" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-group">
+
         <label>What to Change</label>
         <select name="field_changed" id="field-select" onchange="updateFieldUI()">
           <option value="journey_date">Journey Date</option>

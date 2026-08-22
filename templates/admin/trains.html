@@ -63,8 +63,10 @@
               {% if current_user.role == 'super_admin' %}
               <a href="{{ url_for('admin.edit_train_stops', train_id=train.train_id) }}" class="btn btn-ghost btn-sm">✏ Edit Stops</a>
               <form method="POST" action="{{ url_for('admin.remove_train', train_id=train.train_id) }}" onsubmit="return confirm('Remove this train? All related data will be deleted.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-danger btn-sm">Remove</button>
               </form>
+
               {% else %}
               <span style="color:var(--muted);font-size:12px;">No actions available</span>
               {% endif %}
