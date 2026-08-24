@@ -2,6 +2,23 @@
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}Passenger Dashboard{% endblock %}
 
+{% block extra_head %}
+<style>
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 600px) {
+  .quick-action-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="stats-grid">
   <div class="stat-card">
@@ -23,7 +40,8 @@
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px">
+<div class="quick-action-grid">
+
   <a href="{{ url_for('user.search') }}" class="card" style="text-decoration:none;border-color:rgba(108,99,255,0.3);display:flex;align-items:center;gap:16px;transition:border-color 0.2s" onmouseover="this.style.borderColor='#6c63ff'" onmouseout="this.style.borderColor='rgba(108,99,255,0.3)'">
     <div style="width:48px;height:48px;background:rgba(108,99,255,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🔍</div>
     <div>

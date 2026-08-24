@@ -4,6 +4,22 @@
 
 {% block extra_head %}
 <style>
+.search-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+@media (max-width: 768px) {
+  .search-form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .search-form-grid button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 .seat-map-grid {
   display: flex; flex-direction: column; gap: 6px;
   margin-top: 10px; margin-bottom: 20px;
@@ -13,21 +29,22 @@
   display: flex; align-items: center; gap: 6px;
 }
 .seat-btn {
-  width: 32px; height: 32px; border-radius: 6px;
+  width: 36px; height: 36px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 600; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg3);
   color: var(--text); transition: all 0.2s;
+  touch-action: manipulation;
 }
 .seat-btn:hover:not(.booked) {
-  border-color: var(--primary); background: rgba(100, 108, 255, 0.1);
+  border-color: var(--accent); background: rgba(108, 99, 255, 0.15);
 }
 .seat-btn.selected {
-  background: var(--primary); color: white; border-color: var(--primary);
+  background: var(--accent); color: white; border-color: var(--accent);
 }
 .seat-btn.booked {
   background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2);
-  color: var(--text-muted); cursor: not-allowed;
+  color: var(--muted); cursor: not-allowed;
 }
 .aisle-gap { width: 16px; }
 </style>
@@ -37,7 +54,8 @@
 <div class="card" style="margin-bottom:24px">
   <div class="card-title" style="margin-bottom:16px">Find Your Train</div>
   <form method="GET">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:end">
+    <div class="search-form-grid">
+
       <div class="form-group" style="margin-bottom:0">
         <label>From</label>
         <select name="source_station_id" required>

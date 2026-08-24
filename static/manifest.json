@@ -1,0 +1,57 @@
+{
+  "name": "RailSync — Smart Railway Platform",
+  "short_name": "RailSync",
+  "description": "Real-time train tracking, AI platform allocation, and smart railway ticketing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0b0f",
+  "theme_color": "#0a0b0f",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["travel", "transportation", "navigation", "utilities"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Search Trains",
+      "short_name": "Search",
+      "description": "Search available trains and routes",
+      "url": "/user/search",
+      "icons": [{ "src": "/static/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Bookings",
+      "short_name": "Tickets",
+      "description": "View and manage your booked tickets",
+      "url": "/user/my-bookings",
+      "icons": [{ "src": "/static/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Dashboard",
+      "short_name": "Live Status",
+      "description": "Real-time train tracking",
+      "url": "/user/dashboard",
+      "icons": [{ "src": "/static/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  
+  <!-- Android & Mobile PWA Meta -->
+  <meta name="theme-color" content="#0a0b0f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="application-name" content="RailSync">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+
   <title>{% block title %}RailSync{% endblock %} — Smart Railway Platform</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,13 +40,15 @@
       --rail: #6c63ff;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { font-size: 16px; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
     body {
       font-family: 'Space Grotesk', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
     }
     a { color: var(--accent2); text-decoration: none; }
     a:hover { color: #fff; }
@@ -49,11 +62,12 @@
       display: flex; flex-direction: column;
       position: fixed; left: 0; top: 0; bottom: 0;
       z-index: 100;
-      transition: transform 0.3s;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .sidebar-logo {
       padding: 24px 20px 20px;
       border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
     }
     .logo-mark {
       display: flex; align-items: center; gap: 10px;
@@ -67,7 +81,17 @@
     }
     .logo-sub { font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 2px; }
 
-    .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+    .sidebar-close-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 18px;
+      padding: 6px;
+      cursor: pointer;
+    }
+
+    .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .nav-section-label {
       font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
       text-transform: uppercase; color: var(--muted);
@@ -103,6 +127,7 @@
     .main {
       margin-left: 240px; flex: 1;
       display: flex; flex-direction: column;
+      min-width: 0;
     }
     .topbar {
       height: 60px;
@@ -112,7 +137,19 @@
       padding: 0 24px;
       position: sticky; top: 0; z-index: 50;
     }
-    .topbar-title { font-size: 16px; font-weight: 600; }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .mobile-menu-btn {
+      display: none;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 38px; height: 38px;
+      border-radius: 8px;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .topbar-title { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .topbar-actions { display: flex; align-items: center; gap: 12px; }
 
     .notif-btn {
@@ -135,7 +172,7 @@
       display: flex; align-items: center; justify-content: center;
     }
 
-    .page-content { padding: 28px 24px; flex: 1; }
+    .page-content { padding: 28px 24px; flex: 1; min-width: 0; }
 
     /* CARDS */
     .card {
@@ -167,8 +204,9 @@
       padding: 8px 16px; border-radius: 8px;
       font-size: 13px; font-weight: 600; font-family: inherit;
       cursor: pointer; border: none; transition: all 0.2s;
-      text-decoration: none;
+      text-decoration: none; touch-action: manipulation;
     }
+    .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: #7c73ff; color: #fff; }
     .btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--text); }
@@ -190,8 +228,8 @@
     .badge-purple { background: rgba(108,99,255,0.15); color: var(--accent2); }
 
     /* TABLE */
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px; }
     th {
       text-align: left; padding: 10px 14px;
       font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
@@ -206,7 +244,7 @@
     .form-group { margin-bottom: 16px; }
     label { display: block; font-size: 13px; font-weight: 600; color: #c8cadb; margin-bottom: 6px; }
     input, select, textarea {
-      width: 100%; padding: 9px 14px;
+      width: 100%; padding: 10px 14px;
       background: rgba(255,255,255,0.07);
       border: 2px solid rgba(108,99,255,0.50);
       border-radius: 8px; color: var(--text);
@@ -245,13 +283,6 @@
       opacity: 0.4;
     }
 
-    /* RESPONSIVE */
-    @media (max-width: 768px) {
-      .sidebar { transform: translateX(-100%); }
-      .sidebar.open { transform: translateX(0); }
-      .main { margin-left: 0; }
-    }
-
     /* MONOSPACE for IDs, txn codes */
     .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent2); }
 
@@ -269,10 +300,153 @@
       0%, 100% { opacity: 1; box-shadow: 0 0 6px #22c55e; }
       50%       { opacity: 0.35; box-shadow: 0 0 14px #22c55e; }
     }
+
+    /* ════════════════════ ANDROID & MOBILE OPTIMIZATIONS ════════════════════ */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 99;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .sidebar-backdrop.active {
+      display: block;
+      opacity: 1;
+    }
+
+    /* Android Native-Style Bottom Navigation Bar */
+    .bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(60px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(17, 19, 24, 0.95);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      z-index: 90;
+      align-items: center;
+      justify-content: space-around;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .bottom-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      flex: 1;
+      height: 100%;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bottom-nav-item i { font-size: 18px; }
+    .bottom-nav-item.active { color: var(--accent2); }
+    .bottom-nav-item.active i { transform: translateY(-1px); }
+    .bottom-nav-icon-wrap { position: relative; display: inline-flex; }
+    .bottom-notif-dot {
+      position: absolute;
+      top: -2px;
+      right: -4px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    /* PWA Install Banner */
+    .pwa-install-banner {
+      position: fixed;
+      bottom: calc(72px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px);
+      max-width: 440px;
+      background: rgba(19, 21, 29, 0.96);
+      border: 1px solid rgba(108, 99, 255, 0.4);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 85;
+      animation: slideUp .3s ease;
+    }
+    .pwa-banner-left { display: flex; align-items: center; gap: 12px; }
+    .pwa-banner-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--accent); display: flex;
+      align-items: center; justify-content: center;
+      color: #fff; font-size: 16px; flex-shrink: 0;
+    }
+    .pwa-banner-title { font-size: 13px; font-weight: 700; color: #fff; }
+    .pwa-banner-sub { font-size: 11px; color: var(--muted); }
+    .pwa-banner-actions { display: flex; align-items: center; gap: 6px; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translate(-50%, 20px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    /* RESPONSIVE BREAKPOINTS (Mobile & Tablets) */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        width: 280px;
+        box-shadow: 4px 0 30px rgba(0,0,0,0.8);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-close-btn { display: block; }
+      .main { margin-left: 0; }
+      .mobile-menu-btn { display: flex; }
+      .topbar { padding: 0 14px; height: 56px; }
+      .topbar-email { display: none; }
+      .bottom-nav { display: flex; }
+      .page-content {
+        padding: 16px 14px calc(76px + env(safe-area-inset-bottom));
+      }
+      /* Prevent unwanted mobile browser zooming on tap */
+      input, select, textarea { font-size: 16px !important; }
+      .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat-card { padding: 12px; }
+      .stat-value { font-size: 22px; }
+    }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
 <body>
+
+<!-- PWA Android Install Banner -->
+<div class="pwa-install-banner" id="pwa-install-banner">
+  <div class="pwa-banner-left">
+    <div class="pwa-banner-icon"><i class="fa-solid fa-train-subway"></i></div>
+    <div>
+      <div class="pwa-banner-title">Install RailSync App</div>
+      <div class="pwa-banner-sub">Faster access &amp; instant alerts</div>
+    </div>
+  </div>
+  <div class="pwa-banner-actions">
+    <button class="btn btn-primary btn-sm" id="pwa-install-btn"><i class="fa-solid fa-download"></i> Install</button>
+    <button class="btn btn-ghost btn-sm" id="pwa-dismiss-btn" style="padding:5px 8px">&times;</button>
+  </div>
+</div>
+
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
 
 <div class="layout">
   {% if current_user.is_authenticated %}
@@ -285,6 +459,7 @@
           <div class="logo-sub">Smart Railway System</div>
         </div>
       </div>
+      <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close navigation"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <nav class="sidebar-nav">
@@ -335,6 +510,11 @@
             <span class="icon"><i class="fa-solid fa-comments"></i></span> Admin Chat
             <span id="chat-nav-badge" class="badge badge-red" style="margin-left:auto;display:none">0</span>
           </a>
+        {% elif current_user.role == 'driver' %}
+          <div class="nav-section-label">Locomotive Pilot</div>
+          <a href="{{ url_for('driver.dashboard') }}" class="nav-item {% if request.endpoint == 'driver.dashboard' %}active{% endif %}">
+            <span class="icon"><i class="fa-solid fa-gauge-high"></i></span> Cockpit Dashboard
+          </a>
         {% else %}
           <div class="nav-section-label">Station Master</div>
           <a href="{{ url_for('admin.dashboard') }}" class="nav-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
@@ -362,7 +542,7 @@
 
     <div class="sidebar-footer">
       <div class="user-chip">
-        <div class="avatar">{{ current_user.name[0].upper() }}</div>
+        <div class="avatar">{{ current_user.name[0].upper() if current_user.name else 'U' }}</div>
         <div>
           <div style="font-size:13px;font-weight:600">{{ current_user.name }}</div>
           <div style="font-size:11px;color:var(--muted)">{{ current_user.role|capitalize }}</div>
@@ -378,7 +558,12 @@
   <div class="main">
     {% if current_user.is_authenticated %}
     <header class="topbar">
-      <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Open Navigation">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+      </div>
       <div class="topbar-actions">
         {% if current_user.role == 'user' %}
         <a href="{{ url_for('user.notifications') }}" class="notif-btn" id="notif-btn" title="Notifications">
@@ -391,7 +576,7 @@
           <span class="notif-badge" id="chat-topbar-badge" style="display:none"></span>
         </a>
         {% endif %}
-        <div style="font-size:13px;color:var(--muted)">{{ current_user.email }}</div>
+        <div class="topbar-email" style="font-size:13px;color:var(--muted)">{{ current_user.email }}</div>
       </div>
     </header>
     {% endif %}
@@ -411,6 +596,83 @@
   </div>
 </div>
 
+<!-- Android Mobile App Bottom Navigation Bar -->
+{% if current_user.is_authenticated %}
+<nav class="bottom-nav">
+  {% if current_user.role == 'user' %}
+    <a href="{{ url_for('user.dashboard') }}" class="bottom-nav-item {% if request.endpoint == 'user.dashboard' %}active{% endif %}">
+      <i class="fa-solid fa-house"></i><span>Home</span>
+    </a>
+    <a href="{{ url_for('user.search') }}" class="bottom-nav-item {% if request.endpoint == 'user.search' %}active{% endif %}">
+      <i class="fa-solid fa-magnifying-glass"></i><span>Search</span>
+    </a>
+    <a href="{{ url_for('user.my_bookings') }}" class="bottom-nav-item {% if request.endpoint == 'user.my_bookings' %}active{% endif %}">
+      <i class="fa-solid fa-ticket"></i><span>Tickets</span>
+    </a>
+    <a href="{{ url_for('user.notifications') }}" class="bottom-nav-item {% if request.endpoint == 'user.notifications' %}active{% endif %}">
+      <div class="bottom-nav-icon-wrap">
+        <i class="fa-solid fa-bell"></i>
+        <span class="bottom-notif-dot" id="bottom-notif-dot" style="display:none"></span>
+      </div>
+      <span>Alerts</span>
+    </a>
+    <button type="button" class="bottom-nav-item" onclick="toggleSidebar()">
+      <i class="fa-solid fa-bars"></i><span>Menu</span>
+    </button>
+
+  {% elif current_user.role == 'admin' %}
+    <a href="{{ url_for('admin.dashboard') }}" class="bottom-nav-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+      <i class="fa-solid fa-chart-line"></i><span>Station</span>
+    </a>
+    <a href="{{ url_for('admin.trains') }}" class="bottom-nav-item {% if request.endpoint == 'admin.trains' %}active{% endif %}">
+      <i class="fa-solid fa-train"></i><span>Trains</span>
+    </a>
+    <a href="{{ url_for('admin.platforms') }}" class="bottom-nav-item {% if request.endpoint == 'admin.platforms' %}active{% endif %}">
+      <i class="fa-solid fa-signs-post"></i><span>Platforms</span>
+    </a>
+    <a href="{{ url_for('admin.chat') }}" class="bottom-nav-item {% if request.endpoint == 'admin.chat' %}active{% endif %}">
+      <div class="bottom-nav-icon-wrap">
+        <i class="fa-solid fa-comments"></i>
+        <span class="bottom-notif-dot" id="bottom-chat-dot" style="display:none"></span>
+      </div>
+      <span>Chat</span>
+    </a>
+    <button type="button" class="bottom-nav-item" onclick="toggleSidebar()">
+      <i class="fa-solid fa-bars"></i><span>Menu</span>
+    </button>
+
+  {% elif current_user.role == 'super_admin' %}
+    <a href="{{ url_for('admin.super_dashboard') }}" class="bottom-nav-item {% if request.endpoint == 'admin.super_dashboard' %}active{% endif %}">
+      <i class="fa-solid fa-globe"></i><span>HQ</span>
+    </a>
+    <a href="{{ url_for('admin.trains') }}" class="bottom-nav-item {% if request.endpoint == 'admin.trains' %}active{% endif %}">
+      <i class="fa-solid fa-train"></i><span>Trains</span>
+    </a>
+    <a href="{{ url_for('admin.super_masters') }}" class="bottom-nav-item {% if 'master' in request.endpoint %}active{% endif %}">
+      <i class="fa-solid fa-user-tie"></i><span>Masters</span>
+    </a>
+    <a href="{{ url_for('admin.chat') }}" class="bottom-nav-item {% if request.endpoint == 'admin.chat' %}active{% endif %}">
+      <div class="bottom-nav-icon-wrap">
+        <i class="fa-solid fa-comments"></i>
+        <span class="bottom-notif-dot" id="bottom-chat-dot" style="display:none"></span>
+      </div>
+      <span>Chat</span>
+    </a>
+    <button type="button" class="bottom-nav-item" onclick="toggleSidebar()">
+      <i class="fa-solid fa-bars"></i><span>Menu</span>
+    </button>
+
+  {% elif current_user.role == 'driver' %}
+    <a href="{{ url_for('driver.dashboard') }}" class="bottom-nav-item active">
+      <i class="fa-solid fa-gauge-high"></i><span>Cockpit</span>
+    </a>
+    <a href="{{ url_for('auth.logout') }}" class="bottom-nav-item">
+      <i class="fa-solid fa-arrow-right-from-bracket"></i><span>Logout</span>
+    </a>
+  {% endif %}
+</nav>
+{% endif %}
+
 <script id="railsync-data" type="application/json">
 {
   "isAuthenticated": {{ 'true' if current_user.is_authenticated else 'false' }},
@@ -420,6 +682,76 @@
 }
 </script>
 <script>
+  // Mobile drawer controls
+  function toggleSidebar() {
+    var sb = document.getElementById('sidebar');
+    var bd = document.getElementById('sidebar-backdrop');
+    if (sb) sb.classList.toggle('open');
+    if (bd) bd.classList.toggle('active');
+    triggerHaptic();
+  }
+  function closeSidebar() {
+    var sb = document.getElementById('sidebar');
+    var bd = document.getElementById('sidebar-backdrop');
+    if (sb) sb.classList.remove('open');
+    if (bd) bd.classList.remove('active');
+  }
+
+  // Haptic Feedback for Android
+  function triggerHaptic(type) {
+    if (navigator.vibrate) {
+      if (type === 'heavy') navigator.vibrate([25, 40, 25]);
+      else if (type === 'success') navigator.vibrate([15, 30, 15]);
+      else navigator.vibrate(12);
+    }
+  }
+
+  // PWA Service Worker Registration
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js').then(function(reg) {
+        console.log('[PWA] Service Worker active');
+      }).catch(function(err) {
+        console.warn('[PWA] Service Worker registration failed:', err);
+      });
+    });
+  }
+
+  // PWA Android Install Prompt Management
+  var deferredPrompt;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    var banner = document.getElementById('pwa-install-banner');
+    if (banner && !sessionStorage.getItem('pwa_dismissed')) {
+      banner.style.display = 'flex';
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var installBtn = document.getElementById('pwa-install-btn');
+    var dismissBtn = document.getElementById('pwa-dismiss-btn');
+    var banner = document.getElementById('pwa-install-banner');
+
+    if (installBtn) {
+      installBtn.addEventListener('click', function() {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function(choice) {
+            deferredPrompt = null;
+            if (banner) banner.style.display = 'none';
+          });
+        }
+      });
+    }
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', function() {
+        if (banner) banner.style.display = 'none';
+        sessionStorage.setItem('pwa_dismissed', '1');
+      });
+    }
+  });
+
   (function() {
     // Global fetch interceptor to automatically attach X-CSRFToken header on POST/PUT/DELETE
     var _origFetch = window.fetch;
@@ -448,9 +780,13 @@
           .then(function(r) { return r.json(); })
           .then(function(d) {
             var badge = document.getElementById('notif-count');
+            var bottomDot = document.getElementById('bottom-notif-dot');
             if (badge) {
               badge.textContent = d.count;
               badge.style.display = d.count > 0 ? 'flex' : 'none';
+            }
+            if (bottomDot) {
+              bottomDot.style.display = d.count > 0 ? 'block' : 'none';
             }
           })
           .catch(function() {});
@@ -469,7 +805,7 @@
             var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
             var popup = document.createElement('div');
             popup.id = 'cr-popup-shown';
-            popup.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;width:360px;background:var(--card-bg);border:1px solid var(--amber);border-radius:14px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:slideUp .3s ease';
+            popup.style.cssText = 'position:fixed;bottom:calc(68px + env(safe-area-inset-bottom));right:16px;left:16px;max-width:380px;margin:0 auto;z-index:9999;background:var(--card-bg);border:1px solid var(--amber);border-radius:14px;padding:18px;box-shadow:0 8px 32px rgba(0,0,0,.6);animation:slideUp .3s ease';
             popup.innerHTML =
               '<div style="font-size:15px;font-weight:700;margin-bottom:8px;color:var(--amber)">\uD83D\uDD14 Booking Change Request</div>' +
               '<div style="font-size:13px;margin-bottom:4px"><b>' + escHtml(cr.station) + '</b> station master wants to change:</div>' +
@@ -485,6 +821,7 @@
               '</div>' +
               '<button onclick="this.parentElement.remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">&times;</button>';
             document.body.appendChild(popup);
+            triggerHaptic('heavy');
           })
           .catch(function() {});
       }
@@ -497,7 +834,6 @@
         var socket = io();
         socket.emit('join', { room: 'user_' + cfg.userId });
         socket.on('change_request', function(data) {
-          // Trigger popup immediately
           checkPendingChanges();
         });
       }
@@ -510,8 +846,10 @@
           .then(function(d) {
             var b1 = document.getElementById('chat-nav-badge');
             var b2 = document.getElementById('chat-topbar-badge');
+            var b3 = document.getElementById('bottom-chat-dot');
             if (b1) { b1.textContent = d.count; b1.style.display = d.count > 0 ? 'inline-flex' : 'none'; }
             if (b2) { b2.textContent = d.count; b2.style.display = d.count > 0 ? 'flex' : 'none'; }
+            if (b3) { b3.style.display = d.count > 0 ? 'block' : 'none'; }
           })
           .catch(function() {});
       }

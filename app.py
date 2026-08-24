@@ -1,5 +1,6 @@
-from flask import Flask
+from flask import Flask, render_template
 import models
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
@@ -49,6 +50,22 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(driver_bp, url_prefix='/driver')
+
+    @app.route('/manifest.json')
+    def manifest():
+        return app.send_static_file('manifest.json')
+
+    @app.route('/sw.js')
+    def service_worker():
+        response = app.send_static_file('sw.js')
+        response.headers['Content-Type'] = 'application/javascript'
+        response.headers['Service-Worker-Allowed'] = '/'
+        return response
+
+    @app.route('/offline')
+    def offline():
+        return render_template('offline.html')
+
 
     @socketio.on('join')
     def on_join(data):
