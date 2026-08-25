@@ -216,21 +216,36 @@
     .alert-info { background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.25); color: var(--accent2); }
 
     .home-btn {
-      position: fixed; top: 24px; left: 24px;
-      width: 44px; height: 44px; border-radius: 50%;
-      background: rgba(255,255,255,0.04); color: var(--muted);
+      position: absolute; top: 20px; left: 20px;
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(255,255,255,0.05); color: var(--muted);
       display: flex; align-items: center; justify-content: center;
-      text-decoration: none; font-size: 18px;
-      border: 1px solid rgba(255,255,255,0.08);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100;
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      text-decoration: none; font-size: 17px;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       animation: alertIn 0.8s ease backwards; animation-delay: 0.2s;
     }
     .home-btn:hover {
-      background: rgba(255,255,255,0.1); color: #fff;
+      background: rgba(255,255,255,0.12); color: #fff;
       transform: translateY(-2px);
-      border-color: rgba(255,255,255,0.2);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(108,99,255,0.2);
+      border-color: rgba(108,99,255,0.4);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(108,99,255,0.3);
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 72px 14px 28px;
+        align-items: flex-start;
+      }
+      .home-btn {
+        top: 16px;
+        left: 16px;
+      }
+      .card {
+        padding: 32px 18px;
+        border-radius: 20px;
+      }
     }
 
     /* Stagger form fields */

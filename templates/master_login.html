@@ -128,28 +128,98 @@
     h2 { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 6px; }
     .sub { font-size: 14px; color: var(--muted); text-align: center; margin-bottom: 32px; }
 
-    /* ROLE TABS */
-    .role-tabs {
+    /* ===== MODERN ROLE SELECTOR ===== */
+    .role-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 26px;
+    }
+    .role-card {
       position: relative;
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      background: rgba(0,0,0,0.25); border-radius: 14px;
-      margin-bottom: 28px; padding: 4px;
-      border: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 6px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+      user-select: none;
+      text-align: center;
     }
-    .role-tab {
-      padding: 11px; border-radius: 10px; cursor: pointer;
-      background: transparent; color: var(--muted);
-      font-family: inherit; font-size: 13px; font-weight: 600;
-      border: none; transition: all 0.3s; position: relative; z-index: 2;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+    .role-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(34, 197, 94, 0.35);
+      color: var(--text);
+      transform: translateY(-2px);
     }
-    .role-tab.active { color: #fff; }
-    .tab-slider {
-      position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(33.333% - 4px);
-      background: rgba(34,197,94,0.2); border-radius: 10px;
-      border: 1px solid rgba(34,197,94,0.25);
-      box-shadow: 0 2px 12px rgba(34,197,94,0.15);
-      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1;
+    .role-icon-wrap {
+      font-size: 17px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.25s;
+    }
+    .role-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.25;
+    }
+    .role-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+    }
+    .role-desc {
+      font-size: 9px;
+      opacity: 0.65;
+      margin-top: 2px;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .role-card.active {
+      background: linear-gradient(145deg, rgba(34, 197, 94, 0.22), rgba(34, 197, 94, 0.06));
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    .role-card.active .role-icon-wrap {
+      color: var(--accent);
+      transform: scale(1.15);
+    }
+    .role-card.active .role-desc {
+      color: rgba(255, 255, 255, 0.85);
+      opacity: 1;
+    }
+
+    @media (max-width: 480px) {
+      .role-selector {
+        gap: 6px;
+      }
+      .role-card {
+        padding: 10px 4px;
+        border-radius: 12px;
+      }
+      .role-icon-wrap {
+        font-size: 15px;
+        margin-bottom: 4px;
+      }
+      .role-title {
+        font-size: 11px;
+      }
+      .role-desc {
+        font-size: 8px;
+      }
     }
 
     .form-group { margin-bottom: 22px; position: relative; }
@@ -240,21 +310,36 @@
     .alert-info { background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.25); color: var(--purple2); }
 
     .home-btn {
-      position: fixed; top: 24px; left: 24px;
-      width: 44px; height: 44px; border-radius: 50%;
-      background: rgba(255,255,255,0.04); color: var(--muted);
+      position: absolute; top: 20px; left: 20px;
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(255,255,255,0.05); color: var(--muted);
       display: flex; align-items: center; justify-content: center;
-      text-decoration: none; font-size: 18px;
-      border: 1px solid rgba(255,255,255,0.08);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100;
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      text-decoration: none; font-size: 17px;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       animation: alertIn 0.8s ease backwards; animation-delay: 0.2s;
     }
     .home-btn:hover {
-      background: rgba(255,255,255,0.1); color: #fff;
+      background: rgba(255,255,255,0.12); color: #fff;
       transform: translateY(-2px);
-      border-color: rgba(255,255,255,0.2);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(108,99,255,0.2);
+      border-color: rgba(34,197,94,0.4);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(34,197,94,0.3);
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 72px 14px 28px;
+        align-items: flex-start;
+      }
+      .home-btn {
+        top: 16px;
+        left: 16px;
+      }
+      .card {
+        padding: 32px 18px;
+        border-radius: 20px;
+      }
     }
 
     /* Stagger form fields */
@@ -290,18 +375,36 @@
     {% endfor %}
   {% endwith %}
 
-  <div class="role-tabs stagger-1">
-    <div class="tab-slider" id="tab-slider"></div>
-    <button type="button" class="role-tab active" id="tab-admin" onclick="setRole('admin')"><i class="fa-solid fa-user-tie"></i> Station Master</button>
-    <button type="button" class="role-tab" id="tab-super" onclick="setRole('super_admin')"><i class="fa-solid fa-globe"></i> Super Admin</button>
-    <button type="button" class="role-tab" id="tab-driver" onclick="setRole('driver')"><i class="fa-solid fa-train"></i> Train Driver</button>
+  <div class="role-selector stagger-1">
+    <button type="button" class="role-card active" id="tab-admin" onclick="setRole('admin')">
+      <div class="role-icon-wrap"><i class="fa-solid fa-user-tie"></i></div>
+      <div class="role-text">
+        <span class="role-title">Station Master</span>
+        <span class="role-desc">Station Depot</span>
+      </div>
+    </button>
+    
+    <button type="button" class="role-card" id="tab-super" onclick="setRole('super_admin')">
+      <div class="role-icon-wrap"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="role-text">
+        <span class="role-title">Super Admin</span>
+        <span class="role-desc">HQ Control</span>
+      </div>
+    </button>
+    
+    <button type="button" class="role-card" id="tab-driver" onclick="setRole('driver')">
+      <div class="role-icon-wrap"><i class="fa-solid fa-train"></i></div>
+      <div class="role-text">
+        <span class="role-title">Train Driver</span>
+        <span class="role-desc">Loco Pilot</span>
+      </div>
+    </button>
   </div>
 
   <form method="POST" action="{{ url_for('auth.admin_login') }}" autocomplete="off">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="role" id="role-input" value="{{ request.args.get('role', 'admin') }}">
 
-    
     <div class="form-group stagger-2">
       <label><i class="fa-solid fa-envelope"></i> Staff Email</label>
       <input type="email" name="email" placeholder="staff@railsync.com" required autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="email">
@@ -336,12 +439,6 @@ function setRole(role) {
   document.getElementById('tab-admin').classList.toggle('active', isAdmin);
   document.getElementById('tab-super').classList.toggle('active', isSuper);
   document.getElementById('tab-driver').classList.toggle('active', isDriver);
-  
-  let translateX = '0';
-  if (isSuper) translateX = '100%';
-  if (isDriver) translateX = '200%';
-  
-  document.getElementById('tab-slider').style.transform = `translateX(${translateX})`;
   
   localStorage.setItem('railSyncMasterRole', role);
 }
