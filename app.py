@@ -67,6 +67,11 @@ def create_app():
         return render_template('offline.html')
 
 
+    @app.route('/health')
+    @app.route('/ping')
+    def health_check():
+        return {'status': 'healthy', 'service': 'RailSync'}, 200
+
     @socketio.on('join')
     def on_join(data):
         from flask_socketio import join_room
