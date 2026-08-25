@@ -47,6 +47,22 @@
   color: var(--muted); cursor: not-allowed;
 }
 .aisle-gap { width: 16px; }
+.booking-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+@media (max-width: 768px) {
+  .booking-form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .booking-form-grid button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>
 {% endblock %}
 
@@ -165,7 +181,7 @@
         <input type="hidden" name="selected_seats" id="selected_seats_{{ t.train.train_id }}" value="">
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end">
+      <div class="booking-form-grid">
         <div class="form-group" style="margin-bottom:0">
           <label>Payment Method</label>
           <select name="payment_method">

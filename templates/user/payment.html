@@ -4,77 +4,71 @@
 {% block page_title %}Complete Payment{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
-    <div class="col-md-6 col-lg-5">
-        <div class="card shadow-lg" style="border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: var(--surface);">
+<div style="display: flex; justify-content: center; align-items: center; min-height: 65vh; padding: 10px 0;">
+    <div style="width: 100%; max-width: 480px;">
+        <div class="card" style="border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: var(--surface); padding: 0;">
             
             <!-- Header -->
-            <div style="background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%); padding: 30px 20px; text-align: center; color: white;">
-                <h3 class="mb-1" style="font-weight: 700; letter-spacing: -0.5px;">
-                    <i class="bi bi-shield-check me-2" style="opacity: 0.9;"></i>Secure Checkout
+            <div style="background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%); padding: 26px 20px; text-align: center; color: white;">
+                <h3 style="font-weight: 700; letter-spacing: -0.5px; font-size: 20px; margin-bottom: 4px;">
+                    <i class="fa-solid fa-shield-halved" style="margin-right: 8px; opacity: 0.9;"></i>Secure Checkout
                 </h3>
-                <div style="font-size: 13px; opacity: 0.8; font-family: monospace;">TXN: {{ payment.transaction_id }}</div>
+                <div class="mono" style="font-size: 12px; opacity: 0.85;">TXN: {{ payment.transaction_id }}</div>
             </div>
             
-            <div class="card-body p-4 p-md-5" style="background: var(--surface);">
+            <div style="padding: 24px;">
                 
                 <!-- Summary Details -->
-                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
                     
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <span style="color: var(--text-muted); font-size: 14px;">Train Details</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px;">
+                        <span style="color: var(--muted);">Train Details</span>
                         <span style="font-weight: 600; color: var(--text);">{{ payment.booking.train.train_number }} - {{ payment.booking.train.train_name }}</span>
                     </div>
                     
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <span style="color: var(--text-muted); font-size: 14px;">Seat(s) Selected</span>
-                        <span style="font-weight: 600; color: var(--green); background: rgba(34,197,94,0.1); padding: 2px 8px; border-radius: 4px;">{{ payment.booking.seat_number or 'WAITLIST' }}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px;">
+                        <span style="color: var(--muted);">Seat(s) Selected</span>
+                        <span style="font-weight: 600; color: var(--green); background: rgba(34,197,94,0.12); padding: 2px 8px; border-radius: 4px;">{{ payment.booking.seat_number or 'WAITLIST' }}</span>
                     </div>
                     
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <span style="color: var(--text-muted); font-size: 14px;">Payment Method</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 13px;">
+                        <span style="color: var(--muted);">Payment Method</span>
                         <span style="font-weight: 600; color: var(--text);">
-                            <i class="bi bi-wallet2 me-1 opacity-75"></i> {{ payment.payment_method }}
+                            <i class="fa-solid fa-wallet" style="margin-right: 4px; opacity: 0.75;"></i> {{ payment.payment_method }}
                         </span>
                     </div>
                     
-                    <div style="border-top: 1px dashed var(--border); margin: 0 -20px 20px -20px;"></div>
+                    <div style="border-top: 1px dashed var(--border); margin: 0 -18px 16px -18px;"></div>
                     
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--text-muted); font-size: 15px; font-weight: 600;">Total Amount</span>
-                        <span style="font-size: 32px; font-weight: 800; color: var(--primary); letter-spacing: -1px;">₹{{ "%.2f"|format(payment.amount) }}</span>
+                        <span style="color: var(--muted); font-size: 14px; font-weight: 600;">Total Amount</span>
+                        <span style="font-size: 28px; font-weight: 800; color: var(--accent2); letter-spacing: -0.5px;">₹{{ "%.2f"|format(payment.amount) }}</span>
                     </div>
                 </div>
 
-                <div style="text-align: center; color: var(--text-muted); font-size: 13px; margin-bottom: 24px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <i class="bi bi-info-circle"></i> This is a mock payment gateway simulator
+                <div style="text-align: center; color: var(--muted); font-size: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i class="fa-solid fa-circle-info"></i> This is a mock payment gateway simulator
                 </div>
 
                 <!-- Action Buttons -->
-                <form action="{{ url_for('user.process_payment', payment_id=payment.payment_id) }}" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
+                <form action="{{ url_for('user.process_payment', payment_id=payment.payment_id) }}" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" name="action" value="success" class="btn" style="background: var(--green); color: white; border: none; padding: 14px; font-weight: 600; font-size: 16px; border-radius: 8px; transition: transform 0.1s; box-shadow: 0 4px 12px rgba(34,197,94,0.2);">
-
-                        <i class="bi bi-check2-circle me-2"></i> Simulate Successful Payment
+                    <button type="submit" name="action" value="success" class="btn" style="background: var(--green); color: white; border: none; padding: 12px; font-weight: 600; font-size: 14px; border-radius: 8px; justify-content: center; box-shadow: 0 4px 12px rgba(34,197,94,0.2);">
+                        <i class="fa-solid fa-circle-check"></i> Simulate Successful Payment
                     </button>
                     
-                    <button type="submit" name="action" value="fail" class="btn" style="background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.3); padding: 12px; font-weight: 500; border-radius: 8px; transition: all 0.2s;">
-                        <i class="bi bi-x-circle me-2"></i> Simulate Payment Failure
+                    <button type="submit" name="action" value="fail" class="btn" style="background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.3); padding: 10px; font-weight: 500; font-size: 13px; border-radius: 8px; justify-content: center;">
+                        <i class="fa-solid fa-circle-xmark"></i> Simulate Payment Failure
                     </button>
                 </form>
             </div>
         </div>
         
-        <div style="text-align: center; margin-top: 24px;">
-            <a href="{{ url_for('user.my_bookings') }}" style="color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s;">
-                <i class="bi bi-arrow-left me-1"></i> Pay later (Return to Dashboard)
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="{{ url_for('user.my_bookings') }}" style="color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; transition: color 0.2s;">
+                <i class="fa-solid fa-arrow-left" style="margin-right: 4px;"></i> Return to My Bookings
             </a>
         </div>
     </div>
 </div>
-
-<style>
-    .btn:hover { transform: translateY(-1px); }
-    .btn:active { transform: translateY(1px); }
-</style>
 {% endblock %}

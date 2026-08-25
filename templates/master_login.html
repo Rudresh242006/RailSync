@@ -35,7 +35,8 @@
       font-family: 'Space Grotesk', sans-serif;
       background: var(--bg); color: var(--text);
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      position: relative; overflow: hidden;
+      position: relative; overflow-x: hidden;
+      padding: 30px 16px;
     }
     
     /* ===== ANIMATED MESH GRADIENT BG ===== */
@@ -303,13 +304,13 @@
     
     <div class="form-group stagger-2">
       <label><i class="fa-solid fa-envelope"></i> Staff Email</label>
-      <input type="email" name="email" placeholder="Staff Email" required autocomplete="off">
+      <input type="email" name="email" placeholder="staff@railsync.com" required autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="email">
     </div>
     
     <div class="form-group stagger-2">
       <label><i class="fa-solid fa-lock"></i> Secure Passphrase</label>
       <div class="pwd-wrap">
-        <input type="password" name="password" id="password-input" placeholder="Secure Passphrase" required autocomplete="new-password" style="padding-right:42px;">
+        <input type="password" name="password" id="password-input" placeholder="Enter your passphrase" required autocomplete="current-password" style="padding-right:42px;">
         <button type="button" class="pwd-toggle" onclick="togglePassword()"><i class="fa-solid fa-eye" id="pwd-icon"></i></button>
       </div>
     </div>
@@ -358,9 +359,12 @@ function togglePassword() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    let urlRole = new URLSearchParams(window.location.search).get('role');
-    if (urlRole !== 'super_admin') urlRole = 'admin';
-    setRole(urlRole);
+    const params = new URLSearchParams(window.location.search);
+    let role = params.get('role') || localStorage.getItem('railSyncMasterRole') || 'admin';
+    if (!['admin', 'super_admin', 'driver'].includes(role)) {
+        role = 'admin';
+    }
+    setRole(role);
 });
 </script>
 </body>

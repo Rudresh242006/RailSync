@@ -3,7 +3,7 @@
  * Handles offline caching, network fallbacks, and mobile push notifications.
  */
 
-const CACHE_NAME = 'railsync-pwa-v1';
+const CACHE_NAME = 'railsync-pwa-v2';
 const OFFLINE_URL = '/offline';
 
 const PRECACHE_ASSETS = [
@@ -17,13 +17,17 @@ const PRECACHE_ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js'
 ];
 
-// Install: Pre-cache critical application shell assets
+// Install: Pre-cache critical application shell assets with individual resilience
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('[SW] Pre-caching partial failure:', err);
-      });
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const asset of PRECACHE_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('[SW] Pre-caching item skipped:', asset, err);
+        }
+      }
     }).then(() => self.skipWaiting())
   );
 });
@@ -47,9 +51,19 @@ self.addEventListener('activate', (event) => {
 // Fetch: Network-first for pages, Cache-first / Stale-While-Revalidate for static
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  const url = req.url;
 
-  // Skip non-GET and API socket/websocket requests
-  if (req.method !== 'GET' || req.url.includes('/socket.io/')) {
+  // Skip non-GET, WebSockets, healthchecks, and dynamic REST APIs (ensures real-time accuracy)
+  if (
+    req.method !== 'GET' ||
+    url.includes('/socket.io/') ||
+    url.includes('/api/') ||
+    url.includes('/user/api/') ||
+    url.includes('/admin/api/') ||
+    url.includes('/health') ||
+    url.includes('/ping') ||
+    !url.startsWith('http')
+  ) {
     return;
   }
 
@@ -58,7 +72,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((networkRes) => {
-          // Cache successful navigation responses for fast re-entry
           if (networkRes.status === 200) {
             const resClone = networkRes.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));

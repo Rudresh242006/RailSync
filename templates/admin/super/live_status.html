@@ -377,6 +377,41 @@
   display: flex; align-items: center; justify-content: center;
 }
 .leaflet-marker-icon { background: transparent; border: none; }
+  @media (max-width: 900px) {
+    .ls-wrapper {
+      flex-direction: column;
+      height: auto;
+      overflow: visible;
+      margin: -16px -14px 20px;
+    }
+    #ls-map {
+      height: 52vh;
+      min-height: 380px;
+    }
+    .ls-panel {
+      width: 100%;
+      height: auto;
+      max-height: 500px;
+      border-left: none;
+      border-top: 1px solid rgba(108,99,255,0.2);
+    }
+    #ls-stats-bar {
+      left: 8px;
+      right: 8px;
+      top: 8px;
+      gap: 8px;
+      padding: 6px 10px;
+    }
+    .ls-stat-item-val {
+      font-size: 13px;
+    }
+    .ls-stat-item-lbl {
+      font-size: 8px;
+    }
+    #ls-legend {
+      display: none;
+    }
+  }
 </style>
 {% endblock %}
 

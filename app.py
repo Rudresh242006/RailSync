@@ -72,6 +72,12 @@ def create_app():
     def health_check():
         return {'status': 'healthy', 'service': 'RailSync'}, 200
 
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        from flask import flash, redirect, request, url_for
+        flash("Too many attempts. Please wait a moment and try again.", "warning")
+        return redirect(request.referrer or url_for('auth.login'))
+
     @socketio.on('join')
     def on_join(data):
         from flask_socketio import join_room
@@ -140,6 +146,8 @@ def create_app():
                 except Exception as e:
                     print(f"Error in train_progress_task: {e}")
                     db.session.rollback()
+                finally:
+                    db.session.remove()
                 socketio.sleep(10)
                 
     socketio.start_background_task(train_progress_task, app)

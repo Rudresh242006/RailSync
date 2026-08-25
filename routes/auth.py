@@ -47,18 +47,20 @@ def index():
     return render_template('index.html')
 
 
+from sqlalchemy import func
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
 
-        user = User.query.filter_by(email=email).first()
+        user = User.query.filter(func.lower(User.email) == email).first()
         if user and bcrypt.check_password_hash(user.password_hash, password):
-            login_user(user)
+            login_user(user, remember=True)
             flash(f'Welcome back, {user.name}!', 'success')
             return redirect(url_for('user.dashboard'))
         flash('Invalid email or password.', 'danger')
@@ -67,17 +69,17 @@ def login():
 
 
 @auth_bp.route('/admin_login', methods=['GET', 'POST'])
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 def admin_login():
     if current_user.is_authenticated:
         return redirect(url_for('auth.index'))
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         selected_role = request.form.get('role', 'admin')
 
         if selected_role == 'driver':
-            driver = TrainDriver.query.filter_by(email=email).first()
+            driver = TrainDriver.query.filter(func.lower(TrainDriver.email) == email).first()
             try:
                 pw_ok = driver and bcrypt.check_password_hash(driver.password_hash, password)
             except ValueError:
@@ -85,13 +87,13 @@ def admin_login():
                 flash('Driver account has a corrupted password hash. Please contact the system administrator.', 'danger')
             
             if pw_ok:
-                login_user(driver)
+                login_user(driver, remember=True)
                 flash(f'Welcome back, {driver.name}!', 'success')
                 return redirect(url_for('driver.dashboard'))
             else:
                 flash('Invalid driver credentials.', 'danger')
         else:
-            master = StationMaster.query.filter_by(email=email).first()
+            master = StationMaster.query.filter(func.lower(StationMaster.email) == email).first()
 
             try:
                 pw_ok = master and bcrypt.check_password_hash(master.password_hash, password)
@@ -104,7 +106,7 @@ def admin_login():
                     flash('You do not have Super Admin privileges.', 'danger')
                     return redirect(url_for('auth.admin_login', role='super_admin'))
 
-                login_user(master)
+                login_user(master, remember=True)
                 flash('Welcome back, Station Master!', 'success')
                 if master.role == 'super_admin':
                     return redirect(url_for('admin.super_dashboard'))
@@ -168,7 +170,7 @@ def register():
 
 
 @auth_bp.route('/verify-otp', methods=['GET', 'POST'])
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 def verify_otp():
     """OTP confirmation step — activated after registration form submission."""
     if current_user.is_authenticated:
@@ -221,7 +223,7 @@ def verify_otp():
             db.session.commit()
             _PENDING_REGISTRATIONS.pop(reg_token, None)
             session.pop('reg_token', None)
-            login_user(user)
+            login_user(user, remember=True)
             flash(f'Welcome aboard, {user.name}! Your account is verified. 🎉', 'success')
             return redirect(url_for('user.dashboard'))
         else:
@@ -241,7 +243,7 @@ def verify_otp():
 
 
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 def forgot_password():
     """Step 1 — user enters email, OTP is sent."""
     if current_user.is_authenticated:
@@ -255,7 +257,7 @@ def forgot_password():
         # ── Step 1: send OTP ──────────────────────────────────────
         if action == 'send':
             email = request.form.get('email', '').strip().lower()
-            user = User.query.filter_by(email=email).first()
+            user = User.query.filter(func.lower(User.email) == email).first()
             if not user:
                 flash('No account found with that email address.', 'danger')
                 return render_template('forgot_password.html', step='email')

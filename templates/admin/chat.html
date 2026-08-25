@@ -12,7 +12,7 @@
   .contact-name { font-size:13px; font-weight:600; }
   .contact-station { font-size:11px; color:var(--muted); }
   .unread-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); margin-left:auto; flex-shrink:0; }
-  .chat-panel { display:flex; flex-direction:column; }
+  .chat-panel { display:flex; flex-direction:column; min-width:0; }
   .chat-header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; background:var(--bg3); }
   .chat-messages { flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:10px; }
   .msg { max-width:70%; }
@@ -29,6 +29,25 @@
   .chat-input-bar textarea:focus { border-color:var(--accent); outline:none; }
   .chat-empty { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; color:var(--muted); }
   .broadcast-btn { background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:var(--amber); padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
+  .chat-back-btn { display:none; }
+
+  @media (max-width: 768px) {
+    .chat-layout {
+      grid-template-columns: 1fr;
+      height: calc(100vh - 160px);
+    }
+    .contact-list.mobile-hidden {
+      display: none;
+    }
+    .chat-panel.mobile-hidden {
+      display: none;
+    }
+    .chat-back-btn {
+      display: inline-flex !important;
+      padding: 6px 10px;
+    }
+  }
+
   /* Multi-select modal */
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; display:none; align-items:center; justify-content:center; }
   .modal-overlay.open { display:flex; }
@@ -92,6 +111,9 @@
     </div>
     <div id="thread-view" style="display:none;flex:1;flex-direction:column;height:100%">
       <div class="chat-header">
+        <button type="button" class="btn btn-ghost btn-sm chat-back-btn" onclick="backToContacts()" title="Back to contacts">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
         <div class="contact-avatar" id="th-avatar">?</div>
         <div>
           <div id="th-name" style="font-weight:600;font-size:14px"></div>
@@ -145,11 +167,30 @@ function openThread(el) {
   document.getElementById('th-name').textContent = name;
   document.getElementById('th-station').textContent = station || 'Railway HQ';
   document.getElementById('th-avatar').textContent = name[0].toUpperCase();
+
+  // Mobile layout switch
+  if (window.innerWidth <= 768) {
+    var cl = document.getElementById('contact-list');
+    var cp = document.getElementById('chat-panel');
+    if (cl) cl.classList.add('mobile-hidden');
+    if (cp) cp.classList.remove('mobile-hidden');
+  }
+
   // Mark active
   document.querySelectorAll('.contact-item').forEach(function(el) { el.classList.remove('active'); });
   var ci = document.getElementById('contact-' + masterId);
   if (ci) { ci.classList.add('active'); }
   loadMessages(masterId);
+}
+
+function backToContacts() {
+  currentWith = null;
+  var cl = document.getElementById('contact-list');
+  var cp = document.getElementById('chat-panel');
+  if (cl) cl.classList.remove('mobile-hidden');
+  if (cp) cp.classList.remove('mobile-hidden');
+  document.getElementById('thread-view').style.display = 'none';
+  document.getElementById('chat-empty').style.display = 'flex';
 }
 
 // ── Load messages ───────────────────────────────────────────────

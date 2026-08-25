@@ -34,8 +34,8 @@
       font-family: 'Space Grotesk', sans-serif;
       background: var(--bg); color: var(--text);
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      position: relative; overflow: hidden;
-      padding: 40px 20px;
+      position: relative; overflow-x: hidden;
+      padding: 30px 16px;
     }
     
     /* ===== ANIMATED MESH GRADIENT BG ===== */
@@ -271,25 +271,24 @@
   <form method="POST" action="{{ url_for('auth.register') }}" autocomplete="off">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group stagger-1">
-
       <label><i class="fa-solid fa-user"></i> Full Name</label>
-      <input type="text" name="name" placeholder="Full Name" required maxlength="100" autocomplete="off">
+      <input type="text" name="name" placeholder="Full Name" required maxlength="100" autocomplete="name">
     </div>
     
     <div class="form-group stagger-2">
       <label><i class="fa-solid fa-envelope"></i> Email Address</label>
-      <input type="email" name="email" placeholder="Email Address" required maxlength="150" autocomplete="off">
+      <input type="email" name="email" placeholder="name@example.com" required maxlength="150" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="email">
     </div>
     
     <div class="form-group stagger-3">
       <label><i class="fa-solid fa-phone"></i> Phone Number</label>
-      <input type="tel" name="phone" placeholder="Phone Number" required maxlength="15" autocomplete="off">
+      <input type="tel" name="phone" placeholder="10-digit mobile number" required maxlength="15" autocomplete="tel">
     </div>
     
     <div class="form-group stagger-4">
       <label><i class="fa-solid fa-lock"></i> Password</label>
       <div class="pwd-wrap">
-        <input type="password" name="password" id="password-input" placeholder="Password" required minlength="8" autocomplete="new-password" style="padding-right:42px;">
+        <input type="password" name="password" id="password-input" placeholder="Create a password (min 8 chars)" required minlength="8" autocomplete="new-password" style="padding-right:42px;">
         <button type="button" class="pwd-toggle" onclick="togglePassword()"><i class="fa-solid fa-eye" id="pwd-icon"></i></button>
       </div>
     </div>
