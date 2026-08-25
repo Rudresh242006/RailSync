@@ -135,36 +135,28 @@ def register():
             flash('Password must be at least 8 characters.', 'danger')
             return render_template('register.html')
 
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered. Please sign in.', 'warning')
+        if User.query.filter(func.lower(User.email) == email).first():
+            flash('This email is already registered. Please sign in.', 'warning')
             return redirect(url_for('auth.login'))
 
-        from services.email_service import generate_otp, send_otp_email
+        try:
+            pw_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+            user = User(
+                name=name,
+                email=email,
+                phone=phone,
+                password_hash=pw_hash
+            )
+            db.session.add(user)
+            db.session.commit()
 
-        _cleanup_expired_pending()
-
-        otp = generate_otp()
-        reg_token = secrets.token_urlsafe(32)
-        _PENDING_REGISTRATIONS[reg_token] = {
-            'name':          name,
-            'email':         email,
-            'phone':         phone,
-            'password_hash': bcrypt.generate_password_hash(password).decode('utf-8'),
-            'otp':           otp,
-            'otp_expires':   time.time() + 600,   # 10 minutes
-            'attempts':      0,
-        }
-        session['reg_token'] = reg_token
-
-        sent = send_otp_email(email, name, otp)
-        if not sent:
-            _PENDING_REGISTRATIONS.pop(reg_token, None)
-            session.pop('reg_token', None)
-            flash('Could not send verification email. Please try again.', 'danger')
+            login_user(user, remember=True)
+            flash(f'Welcome to RailSync, {user.name}! Your account has been created. 🎉', 'success')
+            return redirect(url_for('user.dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while creating your account. Please try again.', 'danger')
             return render_template('register.html')
-
-        flash(f'A 6-digit verification code has been sent to {email}.', 'info')
-        return redirect(url_for('auth.verify_otp'))
 
     return render_template('register.html')
 

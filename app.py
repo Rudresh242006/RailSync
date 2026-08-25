@@ -78,6 +78,13 @@ def create_app():
         flash("Too many attempts. Please wait a moment and try again.", "warning")
         return redirect(request.referrer or url_for('auth.login'))
 
+    from flask_wtf.csrf import CSRFError
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        from flask import flash, redirect, request, url_for
+        flash("Your session expired or was refreshed. Please try again.", "warning")
+        return redirect(request.referrer or url_for('auth.login'))
+
     @socketio.on('join')
     def on_join(data):
         from flask_socketio import join_room
